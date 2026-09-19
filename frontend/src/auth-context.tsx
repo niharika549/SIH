@@ -25,24 +25,28 @@ const AUTH_TOKEN_KEY = "skillalign.auth.token";
 
 type AuthContextValue = {
   user: User | null;
+  token: string | null;
   loading: boolean;
   signIn: (credentials: Credentials) => Promise<void>;
   register: (input: Credentials & { full_name: string; role: Role }) => Promise<AuthResponse>;
   signOut: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
-      const token = await storage.secureGet(AUTH_TOKEN_KEY, null);
-      if (typeof token === "string") {
+      const stored = await storage.secureGet(AUTH_TOKEN_KEY, null);
+      if (typeof stored === "string") {
         try {
-          setUser(await apiRequest<User>("/auth/me", { headers: { Authorization: `Bearer ${token}` } }));
+          setUser(await apiRequest<User>("/auth/me", { headers: { Authorization: `Bearer ${stored}` } }));
+          setToken(stored);
         } catch {
           await storage.secureRemove(AUTH_TOKEN_KEY);
         }
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const result = await apiRequest<AuthResponse>("/auth/login", { method: "POST", body: credentials });
     if (!result.access_token) throw new Error("The server did not return a session token");
     await storage.secureSet(AUTH_TOKEN_KEY, result.access_token);
+    setToken(result.access_token);
     setUser(result.user);
   }, []);
 
@@ -62,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const result = await apiRequest<AuthResponse>("/auth/register", { method: "POST", body: input });
     if (result.access_token) {
       await storage.secureSet(AUTH_TOKEN_KEY, result.access_token);
+      setToken(result.access_token);
       setUser(result.user);
     }
     return result;
@@ -69,10 +75,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await storage.secureRemove(AUTH_TOKEN_KEY);
+    setToken(null);
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, signIn, register, signOut }), [loading, register, signIn, signOut, user]);
+  const refresh = useCallback(async () => {
+    if (!token) return;
+    setUser(await apiRequest<User>("/auth/me", { headers: { Authorization: `Bearer ${token}` } }));
+  }, [token]);
+
+  const value = useMemo(
+    () => ({ user, token, loading, signIn, register, signOut, refresh }),
+    [loading, refresh, register, signIn, signOut, token, user],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

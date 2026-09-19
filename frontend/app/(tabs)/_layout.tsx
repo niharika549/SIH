@@ -21,6 +21,8 @@ export default function TabsLayout() {
     );
   }
   if (!user) return <Redirect href="/sign-in" />;
+  if (user.role === "TRAINEE" && !user.profile_complete) return <Redirect href="/onboarding" />;
+  const isTrainee = user.role === "TRAINEE";
   if (usesNativeTabs) {
     return (
       <NativeTabs>
@@ -28,6 +30,18 @@ export default function TabsLayout() {
           <NativeTabs.Trigger.Icon sf="house.fill" />
           <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
+        {isTrainee ? (
+          <NativeTabs.Trigger name="skills">
+            <NativeTabs.Trigger.Icon sf="checklist" />
+            <NativeTabs.Trigger.Label>Skills</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+        ) : null}
+        {isTrainee ? (
+          <NativeTabs.Trigger name="career">
+            <NativeTabs.Trigger.Icon sf="target" />
+            <NativeTabs.Trigger.Label>Career</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+        ) : null}
         <NativeTabs.Trigger name="profile">
           <NativeTabs.Trigger.Icon sf="person.crop.circle" />
           <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
@@ -36,14 +50,18 @@ export default function TabsLayout() {
     );
   }
   return (
-    <Tabs screenOptions={{
-      headerShown: false,
-      tabBarActiveTintColor: colors.brandPrimary,
-      tabBarInactiveTintColor: colors.muted,
-      tabBarStyle: { ...(Platform.OS === "web" ? { height: 64 } : {}) },
-      tabBarItemStyle: { alignSelf: "center" },
-    }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.brandPrimary,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarStyle: { ...(Platform.OS === "web" ? { height: 64 } : {}) },
+        tabBarItemStyle: { alignSelf: "center" },
+      }}
+    >
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="home-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="skills" options={{ title: "Skills", href: isTrainee ? "/skills" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="format-list-checks" color={color} size={size} /> }} />
+      <Tabs.Screen name="career" options={{ title: "Career", href: isTrainee ? "/career" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="target" color={color} size={size} /> }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-circle-outline" color={color} size={size} /> }} />
     </Tabs>
   );

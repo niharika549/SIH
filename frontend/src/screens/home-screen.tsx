@@ -1,8 +1,11 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Link } from "expo-router";
-import { ScrollView, Text, View } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { Link, router } from "expo-router";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { AssessmentHistory, SkillGap } from "@/src/api/authed";
+import { PROFICIENCY_LABEL, useAuthedRequest } from "@/src/api/authed";
 import { useAuth } from "@/src/auth-context";
 import { BrandHeader } from "@/src/components/brand-header";
 import { usesNativeTabs } from "@/src/navigation";
@@ -28,31 +31,149 @@ export function HomeScreen() {
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 18, paddingBottom: bottomChrome + 24 }]}>
-        <View style={styles.topRow}><BrandHeader compact /><View style={styles.roleBadge}><MaterialCommunityIcons name={content.icon} size={16} color={colors.onBrandTertiary} /><Text style={styles.roleText}>{user.role}</Text></View></View>
-        <Text style={styles.eyebrow}>GOOD MORNING, {firstName.toUpperCase()}</Text>
+        <View style={styles.topRow}>
+          <BrandHeader compact />
+          <View style={styles.roleBadge}>
+            <MaterialCommunityIcons name={content.icon} size={16} color={colors.onBrandTertiary} />
+            <Text style={styles.roleText}>{user.role}</Text>
+          </View>
+        </View>
+        <Text style={styles.eyebrow}>HELLO, {firstName.toUpperCase()}</Text>
         <Text style={styles.title}>{content.title}</Text>
         <Text style={styles.subtitle}>{content.subtitle}</Text>
-        <View style={styles.heroCard}>
-          <View style={styles.heroIcon}><MaterialCommunityIcons name="progress-check" size={24} color={colors.onBrandPrimary} /></View>
-          <View style={styles.heroCopy}><Text style={styles.heroTitle}>Foundation connected</Text><Text style={styles.heroText}>Your secure role workspace is ready. Complete your profile to unlock the next SkillAlign journey.</Text></View>
-        </View>
-        <Text style={styles.sectionTitle}>Next steps</Text>
-        <View style={styles.grid}>
-          <InfoCard icon="account-edit-outline" title="Complete profile" text={user.profile_complete ? "Profile complete" : "Add your details"} />
-          <InfoCard icon="bell-outline" title="Notifications" text="In-app alerts will appear here" />
-          <InfoCard icon="lock-outline" title="Privacy first" text="Your access stays role-scoped" />
-          <InfoCard icon="chart-timeline-variant" title="Skill alignment" text="Coming with your portal" />
-        </View>
-        <Link href="/profile" asChild><Text style={styles.profileLink}>Review account and access details →</Text></Link>
+
+        {user.role === "TRAINEE" ? <TraineeDashboard /> : <NonTraineePlaceholder />}
       </ScrollView>
     </View>
   );
 }
 
-function InfoCard({ icon, title, text }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: string; text: string }) {
+function TraineeDashboard() {
   const styles = useStyles();
   const { colors } = useTheme();
-  return <View style={styles.infoCard}><MaterialCommunityIcons name={icon} size={22} color={colors.brandPrimary} /><Text style={styles.infoTitle}>{title}</Text><Text style={styles.infoText}>{text}</Text></View>;
+  const authed = useAuthedRequest();
+
+  const gapQuery = useQuery({
+    queryKey: ["trainee", "skill-gap"],
+    queryFn: () => authed<SkillGap>("/trainee/skill-gap"),
+    retry: false,
+  });
+  const historyQuery = useQuery({
+    queryKey: ["assessment", "history"],
+    queryFn: () => authed<AssessmentHistory[]>("/assessment/history"),
+  });
+
+  const gap = gapQuery.data;
+  const percent = gap && gap.total > 0 ? Math.round((gap.matched / gap.total) * 100) : 0;
+  const nextSkill = gap?.items.find((i) => i.status !== "MET");
+
+  return (
+    <View>
+      <View style={styles.heroCard}>
+        <View style={styles.heroIcon}><MaterialCommunityIcons name="progress-check" size={24} color={colors.onBrandPrimary} /></View>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroTitle}>{gap ? gap.career_name : "Set a career goal"}</Text>
+          <Text style={styles.heroText}>
+            {gap
+              ? `${gap.matched} of ${gap.total} required skills met (${percent}%). ${nextSkill ? `Next up: ${nextSkill.skill_name}.` : "You're on track!"}`
+              : "Choose a career from your profile to start closing skill gaps."}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>Quick actions</Text>
+      <View style={styles.grid}>
+        <ActionCard
+          testID="action-take-assessment"
+          icon="clipboard-check-outline"
+          title={nextSkill ? `Assess ${nextSkill.skill_name}` : "Take an assessment"}
+          text={nextSkill ? "Turn this gap into a proven level" : "Prove your strongest skill"}
+          onPress={() => nextSkill ? router.push(`/assessment/${nextSkill.skill_id}`) : router.push("/skills")}
+        />
+        <ActionCard
+          testID="action-view-gap"
+          icon="target"
+          title="Skill gap"
+          text="See what stands between you and your goal"
+          onPress={() => router.push("/career")}
+        />
+        <ActionCard
+          testID="action-view-skills"
+          icon="format-list-checks"
+          title="My skills"
+          text="Self-declare or reassess any skill"
+          onPress={() => router.push("/skills")}
+        />
+        <ActionCard
+          testID="action-view-training"
+          icon="school-outline"
+          title="Recommended courses"
+          text="Sample training that closes your gaps"
+          onPress={() => router.push("/career")}
+        />
+      </View>
+
+      {historyQuery.data && historyQuery.data.length > 0 ? (
+        <View>
+          <Text style={styles.sectionTitle}>Recent assessments</Text>
+          {historyQuery.data.slice(0, 3).map((h) => (
+            <View key={h.id} style={styles.historyRow} testID={`history-${h.id}`}>
+              <View style={styles.historyCopy}>
+                <Text style={styles.historyTitle}>{h.skill_id.replace(/^skill-/, "").replace(/-/g, " ")}</Text>
+                <Text style={styles.historyMeta}>{h.percentage}% · {PROFICIENCY_LABEL[h.proficiency]} · {new Date(h.submitted_at).toLocaleDateString()}</Text>
+              </View>
+              <MaterialCommunityIcons name="check-decagram" size={20} color={colors.brandPrimary} />
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {gapQuery.isPending || historyQuery.isPending ? (
+        <View style={styles.centered}><ActivityIndicator color={colors.brandPrimary} /></View>
+      ) : null}
+
+      <Link href="/profile" asChild><Text style={styles.profileLink}>Review account and access details →</Text></Link>
+    </View>
+  );
+}
+
+function NonTraineePlaceholder() {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  return (
+    <View>
+      <View style={styles.heroCard}>
+        <View style={styles.heroIcon}><MaterialCommunityIcons name="progress-check" size={24} color={colors.onBrandPrimary} /></View>
+        <View style={styles.heroCopy}><Text style={styles.heroTitle}>Foundation connected</Text><Text style={styles.heroText}>Your secure role workspace is ready. Portal features unlock in the next phases.</Text></View>
+      </View>
+      <Text style={styles.sectionTitle}>Coming next</Text>
+      <View style={styles.grid}>
+        <ActionCard icon="account-edit-outline" title="Portal features" text="Role-specific workspace" onPress={() => undefined} testID="placeholder-portal" />
+        <ActionCard icon="bell-outline" title="Notifications" text="In-app alerts will appear here" onPress={() => undefined} testID="placeholder-notifications" />
+        <ActionCard icon="lock-outline" title="Privacy first" text="Your access stays role-scoped" onPress={() => undefined} testID="placeholder-privacy" />
+        <ActionCard icon="chart-timeline-variant" title="Skill alignment" text="Coming with your portal" onPress={() => undefined} testID="placeholder-alignment" />
+      </View>
+      <Link href="/profile" asChild><Text style={styles.profileLink}>Review account and access details →</Text></Link>
+    </View>
+  );
+}
+
+function ActionCard({ icon, title, text, onPress, testID }: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  text: string;
+  onPress: () => void;
+  testID: string;
+}) {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.infoCard, pressed && styles.pressed]} testID={testID} accessibilityRole="button">
+      <MaterialCommunityIcons name={icon} size={22} color={colors.brandPrimary} />
+      <Text style={styles.infoTitle}>{title}</Text>
+      <Text style={styles.infoText}>{text}</Text>
+    </Pressable>
+  );
 }
 
 const useStyles = makeStyles((colors) => ({
@@ -69,10 +190,16 @@ const useStyles = makeStyles((colors) => ({
   heroCopy: { flex: 1, gap: 5 },
   heroTitle: { color: colors.onBrandPrimary, fontSize: 17, fontWeight: "800" },
   heroText: { color: colors.onBrandPrimary, fontSize: 13, lineHeight: 19 },
-  sectionTitle: { color: colors.onSurface, fontSize: 19, fontWeight: "800", marginTop: 18 },
+  sectionTitle: { color: colors.onSurface, fontSize: 19, fontWeight: "800", marginTop: 22 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   infoCard: { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 7, minHeight: 126, padding: 14, width: "48%" },
+  pressed: { opacity: 0.85 },
   infoTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "800" },
   infoText: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  profileLink: { color: colors.brandPrimary, fontSize: 14, fontWeight: "700", marginTop: 12, paddingVertical: 12 },
+  historyRow: { alignItems: "center", backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 12, marginTop: 8, padding: 12 },
+  historyCopy: { flex: 1, gap: 3 },
+  historyTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "800", textTransform: "capitalize" },
+  historyMeta: { color: colors.muted, fontSize: 12 },
+  centered: { alignItems: "center", padding: 12 },
+  profileLink: { color: colors.brandPrimary, fontSize: 14, fontWeight: "700", marginTop: 16, paddingVertical: 12 },
 }));

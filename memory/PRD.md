@@ -16,8 +16,12 @@ Trainee (skill seeker), Trainer (training provider), Employer (hiring org), Gove
 - **Phase 1 — Foundation (2026-09-19):** COMPLETE & TESTED.
   - Backend: roles enum, JWT register/login/me, ADMIN self-register blocked (403), EMPLOYER/GOVERNMENT register as PENDING (login blocked until admin verifies), unique email index, `_id`/`password_hash` never leak, `/api/admin/access-check` RBAC probe.
   - Frontend: branded auth screen (sign-in/register, role selector), pure-dispatcher routing, protected Home/Profile tabs, sign-out, NativeTabs gate (iOS 26+) with JS Tabs fallback.
-  - Testing: backend 16/16 pytest; UI flows verified end-to-end (iterations 1–4). Bugs fixed: web API URL config, sign-out navigation restructure, invalid icon, resizeMode deprecation, touch target size.
-  - Seeded accounts in `/app/memory/test_credentials.md` (admin / trainee / pending employer).
+  - Testing: backend 16/16 pytest; UI flows verified end-to-end (iterations 1–4).
+- **Phase 2 — Trainee MVP (2026-09-19):** COMPLETE & TESTED.
+  - Shared catalog seeded (idempotent `seed_phase2.py`): 10 IT skills, 4 careers, 50 MCQs across 3 difficulties, 8 sample trainings.
+  - Backend endpoints: `/catalog/{skills,careers,careers/{id},trainings}`; `/trainee/{profile,skills,skill-gap,recommendations}`; `/assessment/{start,submit,history}`. Weighted scoring (BEGINNER=1 / INTERMEDIATE=2 / ADVANCED=3) → proficiency mapping (<25 NONE, <50 BEGINNER, <75 INTERMEDIATE, else ADVANCED). Skill sources SELF_DECLARED / ASSESSED / TRAINER_VERIFIED enforced; self-declare cannot overwrite an ASSESSED level.
+  - Frontend: 4-step onboarding wizard supporting STUDENT / JOB_HOLDER / CAREER_GAP with tailored fields; state + Maharashtra district picker; conditional trainee tabs (Home / Skills / Career / Profile) with route-level role guards; assessment player with progress dots, difficulty pill, per-question review + explanation; trainee dashboard summarising skill gap and next action; career screen with explainable gap table and DEMO-labelled recommendations.
+  - Testing: backend 21/21 pytest; full UI regression across sign-in, onboarding, assessment, skill-gap, recommendations, RBAC, sign-out — zero navigation loops, zero blocking errors.
 
 ## Prioritized Backlog
 - **P1 Phase 2 — Trainee MVP:** categories, technical skills, basic assessment, skill-gap analysis, course recommendations.
@@ -35,4 +39,4 @@ Trainee (skill seeker), Trainer (training provider), Employer (hiring org), Gove
 - DB contains two non-test accounts (24nn1a4432@gmail.com, niharikakuraku123@gmail.com) — confirm with user before any reset.
 
 ## Next Task
-Await user approval for **Phase 2 — Trainee MVP**.
+Await user approval for **Phase 3 — Trainer Portal**.
