@@ -1,4 +1,4 @@
-// Design tokens for this app. Light theme only.Always modify the colors and theme to Dark, Light or Dark and Light according to the design guidelines.
+// Design tokens for SkillAlign. Values mirror /app/design_guidelines.json.
 //
 // The keys match the "color" block of /app/design_guidelines.json. Fill the
 // values from that file (or from the user's brand colors). Keep every key; do
@@ -40,49 +40,49 @@ const light = {
   // Surfaces: backgrounds, from the screen down to small fills.
   // Each `on` key is the text and icon color for that background.
   // ---------------------------------------------------------------------------
-  surface: "#FFFFFF", // primary canvas, most of every screen
-  onSurface: "#111827", // text and icons on the canvas
-  surfaceSecondary: "#F9FAFB", // cards, sheets, list rows
-  onSurfaceSecondary: "#374151", // text and icons on cards, sheets, rows
-  surfaceTertiary: "#F3F4F6", // input backgrounds, chips, deepest nesting
-  onSurfaceTertiary: "#4B5563", // text on inputs and chips; also muted text
-  surfaceInverse: "#1F2937", // tooltips, snackbars, anything popping against the theme
-  onSurfaceInverse: "#FFFFFF", // text and icons on the inverse surface
-  muted: "#6B7280", // subdued text on surface: captions, timestamps, placeholders
+  surface: "#F8F9FA",
+  onSurface: "#1A1D1E",
+  surfaceSecondary: "#FFFFFF",
+  onSurfaceSecondary: "#1A1D1E",
+  surfaceTertiary: "#EEF1F2",
+  onSurfaceTertiary: "#33383B",
+  surfaceInverse: "#111415",
+  onSurfaceInverse: "#F8F9FA",
+  muted: "#57606A",
 
   // ---------------------------------------------------------------------------
   // Brand: the identity color and the fills built from it.
   // Neutral by default; replace with the design guidelines values.
   // ---------------------------------------------------------------------------
-  brand: "#111827", // base hue, anchor only; Primary, Secondary, Tertiary are weights of it
-  onBrand: "#FFFFFF", // text and icons placed directly on brand
-  brandPrimary: "#111827", // primary CTA, active tab indicator, selected states
-  onBrandPrimary: "#FFFFFF", // text and icons on brandPrimary
-  brandSecondary: "#E5E7EB", // secondary CTA, less prominent accents
-  onBrandSecondary: "#111827", // text and icons on brandSecondary
-  brandTertiary: "#F3F4F6", // chips, tags, badges, subtle brand moments
-  onBrandTertiary: "#111827", // text and icons on brandTertiary
+  brand: "#1F6FEB",
+  onBrand: "#FFFFFF",
+  brandPrimary: "#1F6FEB",
+  onBrandPrimary: "#FFFFFF",
+  brandSecondary: "#388BFD",
+  onBrandSecondary: "#FFFFFF",
+  brandTertiary: "#E7F0FF",
+  onBrandTertiary: "#094199",
 
   // ---------------------------------------------------------------------------
   // Status: semantic only, never decorative. Fill for badges, banners and
   // toasts; the `on` key is text on that fill. The plain key is also safe as
   // text on `surface`.
   // ---------------------------------------------------------------------------
-  success: "#15803D",
+  success: "#1F883D",
   onSuccess: "#FFFFFF",
-  warning: "#B45309",
+  warning: "#9A6700",
   onWarning: "#FFFFFF",
-  error: "#B91C1C",
+  error: "#CF222E",
   onError: "#FFFFFF",
-  info: "#1D4ED8",
+  info: "#1F6FEB",
   onInfo: "#FFFFFF",
 
   // ---------------------------------------------------------------------------
   // Lines
   // ---------------------------------------------------------------------------
-  border: "#E5E7EB", // hairline outline, 0.5pt or 1pt max: inputs, cards
-  borderStrong: "#D1D5DB", // focus rings, selected outlines, 1.5pt max
-  divider: "#E5E7EB", // subtle list separators
+  border: "#D0D7DE",
+  borderStrong: "#8C959F",
+  divider: "#E1E4E8",
 };
 
 export type ThemeColors = typeof light;

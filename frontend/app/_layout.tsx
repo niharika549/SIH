@@ -4,6 +4,7 @@ import { LogBox } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { ErrorBoundary } from "@/src/components/error-boundary";
+import { AuthProvider } from "@/src/auth-context";
 import { queryClient } from "@/src/query-client";
 
 // Disable logbox errors etc so that users can see the app
@@ -16,9 +17,11 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <KeyboardProvider>
-          <Stack screenOptions={{ headerShown: false }} />
-        </KeyboardProvider>
+        <AuthProvider>
+          <KeyboardProvider>
+            <Stack screenOptions={{ headerShown: false }} />
+          </KeyboardProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

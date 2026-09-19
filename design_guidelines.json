@@ -1,0 +1,163 @@
+{
+  "app_name": "SkillAlign",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "An authoritative, clean workforce alignment platform bridging talent and industry with iOS-native clarity and precision.",
+  "color": {
+    "surface": "#F8F9FA",
+    "onSurface": "#1A1D1E",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#1A1D1E",
+    "surfaceTertiary": "#EEF1F2",
+    "onSurfaceTertiary": "#33383B",
+    "surfaceInverse": "#111415",
+    "onSurfaceInverse": "#F8F9FA",
+    "brand": "#1F6FEB",
+    "brandPrimary": "#1F6FEB",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#388BFd",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#E7F0FF",
+    "onBrandTertiary": "#094199",
+    "success": "#1F883D",
+    "onSuccess": "#FFFFFF",
+    "warning": "#9A6700",
+    "onWarning": "#FFFFFF",
+    "error": "#CF222E",
+    "onError": "#FFFFFF",
+    "info": "#1F6FEB",
+    "onInfo": "#FFFFFF",
+    "border": "#D0D7DE",
+    "borderStrong": "#8C959F",
+    "divider": "#E1E4E8",
+    "muted": "#57606A",
+    "onBrand": "#FFFFFF"
+  },
+  "typography": {
+    "displayFontFamily": "PlusJakartaSans",
+    "textFontFamily": "Inter",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous iOS-native vertical rhythm with consistent padding and precise touch target alignment.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Use glass blur on sticky headers over scrolling content",
+      "Apply translucent tinted base for foreground readability"
+    ],
+    "dont's": [
+      "Never blur form fields or entire screens",
+      "Avoid heavy drop shadows behind glass surfaces"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Auth & Role Selection",
+      "purpose": "Secure authentication and role selection for Trainee, Trainer, Employer, Government, and Admin.",
+      "states": {
+        "loading": "Checking credentials...",
+        "empty": "Please select your role and sign in.",
+        "error": "Authentication failed. Please check your credentials."
+      },
+      "layout": "Clean centered card layout with role selector chips and secure input fields."
+    },
+    {
+      "name": "Trainee Dashboard",
+      "purpose": "Comprehensive trainee command center showing career goals, skill-gap analysis, recommended courses, and active applications.",
+      "states": {
+        "loading": "Loading your skill profile and recommendations...",
+        "empty": "No career goal set yet. Tap to configure your profile.",
+        "error": "Unable to fetch your skill data. Tap to retry."
+      },
+      "layout": "Vertical scroll with pinned header, hero skill summary card, quick status chips, and structured recommendation modules."
+    },
+    {
+      "name": "Skill-Gap & Assessment",
+      "purpose": "Transparent skill proficiency scoring, gap analysis, and interactive assessment history.",
+      "states": {
+        "loading": "Calculating proficiency scores...",
+        "empty": "No skill assessments completed yet.",
+        "error": "Failed to load assessment data."
+      },
+      "layout": "Modular metric cards with progress bars and side-by-side gap breakdown."
+    },
+    {
+      "name": "Employer & Job Matching",
+      "purpose": "Rule-based candidate matching, job posting management, and application tracking with privacy controls.",
+      "states": {
+        "loading": "Matching verified skills against employer requirements...",
+        "empty": "No job postings or matches available.",
+        "error": "Could not connect to employer matching engine."
+      },
+      "layout": "Card list with match percentage badges, skill verification tags, and sticky action buttons."
+    },
+    {
+      "name": "Government District Intelligence",
+      "purpose": "State and district workforce intelligence map, demand-supply indicators, and training capacity metrics.",
+      "states": {
+        "loading": "Aggregating district workforce data...",
+        "empty": "Select a state or district to view workforce analytics.",
+        "error": "Failed to load government intelligence records."
+      },
+      "layout": "Interactive map overview with side panel drill-down, demographic distribution charts, and DEMO/SAMPLE DATA badges."
+    },
+    {
+      "name": "Admin Control & Audit",
+      "purpose": "Platform-wide user verification, role management, audit logging, and demo data administration.",
+      "states": {
+        "loading": "Loading system audit logs and pending verifications...",
+        "empty": "No pending administrative requests.",
+        "error": "Failed to authenticate admin session."
+      },
+      "layout": "Tabular audit feed with filter controls and bulk verification actions."
+    }
+  ],
+  "images": {
+    "skillalign_logo": {
+      "url": "https://customer-assets-lqy194kg.emergentagent.net/job_labor-match-9/artifacts/1tgxlf7x_WhatsApp%20Image%202026-09-19%20at%2012.43.30%20PM.jpeg",
+      "alt": "SkillAlign From Learning to Earning logo"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Preserve all working backend models, database migrations, and authentication pipelines.",
+    "Implement the 5 role portals (Trainee, Trainer, Employer, Government, Admin) with robust role-based access control.",
+    "Ensure the shared Skill entity connects assessments, job postings, training courses, and government intelligence.",
+    "Clearly label all demonstration and sample datasets as DEMO/SAMPLE DATA.",
+    "Maintain high contrast and accessible touch targets (>= 44x44pt) across all mobile views."
+  ]
+}

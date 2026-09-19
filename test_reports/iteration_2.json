@@ -1,0 +1,37 @@
+{
+  "summary": "Retest of Phase 1 fixes (frontend only, per request). TRAINER ICON FIX: VERIFIED - role-trainer chip now renders a real MaterialCommunityIcons glyph (human-male-board codepoint, no '?' placeholder). REGISTRATION REGRESSION: PASSED - new trainee registered via UI, redirected to Home, Profile tab rendered with new user data. SIGN-OUT FIX: FAILED - the critical bug is NOT fixed and has REGRESSED to the crash variant. Tapping logout-button triggers an infinite render loop (587 'Maximum update depth exceeded' console errors in ~3s) originating in expo-router's forceStoreRerender <- linkTo <- router.replace, fired by the <Redirect href='/'> now rendered in app/(tabs)/_layout.tsx. The entire page freezes (Playwright click/screenshot/evaluate all time out; ErrorBoundary doesn't recover it). Sign-out is fully broken on web.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "TabsLayout sign-out guard", "issue": "STILL BROKEN / REGRESSED: <Redirect href='/'> in app/(tabs)/_layout.tsx:23 causes an infinite 'Maximum update depth exceeded' loop on sign-out because '/' is claimed by BOTH app/index.tsx and app/(tabs)/index.tsx. The replace('/') navigation never leaves the (tabs) group, so the layout re-renders, Redirect remounts and fires replace again -> forceStoreRerender loop -> page freeze. Round-trip sign-in could not even be attempted. Reference: /app/frontend/app/(tabs)/_layout.tsx:23, /app/frontend/app/index.tsx:13-14", "testID": "logout-button", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "Sign out -> auth screen", "issue": "FAILED. After tapping logout-button the app freezes in a render loop; AuthScreen never renders without reload. Verified twice (trainee account and fresh-registered account context).", "affected_testIDs": ["logout-button", "auth-signin-tab", "login-email-input"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "TabsLayout", "issue": "Expo Router <Redirect> inside a layout whose target path '/' is ambiguous (duplicate routes app/index.tsx and app/(tabs)/index.tsx) causes infinite navigation loop. Reference: /app/frontend/app/(tabs)/_layout.tsx:23"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_2.json"],
+  "action_items": [
+    "CRITICAL: Remove the '/' route ambiguity - this is the root cause and the current fix (Redirect in tabs layout) made it worse. Recommended: move AuthScreen to a dedicated unique route, e.g. app/sign-in.tsx; then app/index.tsx becomes a pure dispatcher (if loading -> spinner; if user -> <Redirect href='/(tabs)' />; else <Redirect href='/sign-in' />) and app/(tabs)/_layout.tsx redirects to href='/sign-in' (a path claimed by exactly ONE route). Verify on web: sign out -> AuthScreen immediately, then sign in again on the same page load -> Home renders.",
+    "After fix, retest: sign-out must produce ZERO 'Maximum update depth exceeded' console errors and the page must remain interactive (no freeze).",
+    "VERIFIED OK (no action): Trainer role icon renders correctly; UI registration -> Home redirect -> Profile render works."
+  ],
+  "critical_code_review_comments": [
+    "app/index.tsx renders AuthScreen inline while app/(tabs)/index.tsx shares path '/' - any Redirect to '/' from inside (tabs) is non-deterministic. This structural flaw was flagged in iteration_1 and remains unresolved.",
+    "auth-context.tsx signOut (setUser(null)) is correct; the failure is purely in the navigation layer.",
+    "All other iteration_1 minor fixes confirmed applied: human-male-board icon, resizeMode moved to Image prop, modeTab minHeight 44."
+  ],
+  "updated_files": ["/app/test_reports/iteration_2.json"],
+  "success_rate": {"backend": "not tested (per request, unchanged from 16/16)", "frontend": "50% (icon fix + registration regression PASS; critical sign-out fix FAIL + round-trip BLOCKED)"},
+  "seed_data_creation": "Created and cleaned up 2 UI test users (test.ui*). Also removed 2 leftover pytest users (test_trainee.54fe1937, test_employer.54fe1937) from iteration_1's case-sensitive cleanup miss. Left 24nn1a4432@gmail.com untouched (not test-prefixed; main agent to confirm if it is a real user).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Sign-out currently HARD-FREEZES the web page (infinite Redirect loop). Any Playwright step after clicking logout-button will time out - test sign-out LAST in a script and never call page.screenshot after it. Tab nav selector: page.locator('a[href=\"/profile\"]').last. Console floods with 'Maximum update depth exceeded' from forceStoreRerender/linkTo/replace in expo-router bundle. Public URL: https://labor-match-9.preview.emergentagent.com.",
+  "rca_of_issue": "BUG: Sign-out freeze, REGRESSED from blank-screen to full crash loop. Repro: sign in (trainee.test@skillalign.in / Trainee@Test2026) -> Profile tab -> tap Sign out (logout-button). Observed: 587x 'Maximum update depth exceeded' errors within ~3.5s; stack: Redirect effect -> router.replace('/') -> linkTo -> navigation store forceStoreRerender -> layout re-render -> Redirect remount -> replace again. Root cause: href '/' is matched by TWO routes (app/index.tsx and app/(tabs)/index.tsx), so the router never settles outside the (tabs) group; the layout-level Redirect re-fires on every store rerender. Iteration_1 identified this ambiguity; the applied fix moved the Redirect into the layout without removing the ambiguity, converting a benign blank screen into a fatal render loop. Mitigation: give the auth screen its own unique path (e.g. /sign-in) and point all guards there; keep exactly one route claiming '/'."
+}

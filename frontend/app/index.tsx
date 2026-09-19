@@ -1,30 +1,20 @@
-import { View, StyleSheet, Image } from "react-native";
+import { Redirect } from "expo-router";
+import { ActivityIndicator, View } from "react-native";
 
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { useAuth } from "@/src/auth-context";
+import { makeStyles, useTheme } from "@/src/theme";
 
+// Pure dispatcher: never renders content, only routes. "/" stays ambiguous
+// with (tabs)/index, so redirects always name their target explicitly.
 export default function Index() {
-  console.log(EXPO_PUBLIC_BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL");
-
-  return (
-    <View style={styles.container}>
-      <Image
-        source={require("../assets/images/app-image.png")}
-        style={styles.image}
-      />
-    </View>
-  );
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const { loading, user } = useAuth();
+  if (loading) return <View style={styles.loading}><ActivityIndicator color={colors.brandPrimary} size="large" /></View>;
+  if (user) return <Redirect href="/(tabs)" />;
+  return <Redirect href="/sign-in" />;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0c0c0c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
-  },
-});
+const useStyles = makeStyles((colors) => ({
+  loading: { alignItems: "center", backgroundColor: colors.surface, flex: 1, justifyContent: "center" },
+}));
