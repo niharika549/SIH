@@ -7,9 +7,7 @@ import { useAuth } from "@/src/auth-context";
 import { usesNativeTabs } from "@/src/navigation";
 import { useTheme } from "@/src/theme";
 
-// Single auth guard for every tab screen. When the session ends (sign-out,
-// expired token) the layout redirects to /sign-in, which renders the auth
-// screen. Screens must not run their own redirect guards.
+// Role-based tabs. Single auth guard here — screens never redirect on their own.
 export default function TabsLayout() {
   const { colors } = useTheme();
   const { loading, user } = useAuth();
@@ -23,6 +21,8 @@ export default function TabsLayout() {
   if (!user) return <Redirect href="/sign-in" />;
   if (user.role === "TRAINEE" && !user.profile_complete) return <Redirect href="/onboarding" />;
   const isTrainee = user.role === "TRAINEE";
+  const isTrainer = user.role === "TRAINER";
+  const isAdmin = user.role === "ADMIN";
   if (usesNativeTabs) {
     return (
       <NativeTabs>
@@ -40,6 +40,24 @@ export default function TabsLayout() {
           <NativeTabs.Trigger name="career">
             <NativeTabs.Trigger.Icon sf="target" />
             <NativeTabs.Trigger.Label>Career</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+        ) : null}
+        {isTrainer ? (
+          <NativeTabs.Trigger name="trainings">
+            <NativeTabs.Trigger.Icon sf="book.closed" />
+            <NativeTabs.Trigger.Label>Trainings</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+        ) : null}
+        {isTrainer ? (
+          <NativeTabs.Trigger name="learners">
+            <NativeTabs.Trigger.Icon sf="person.3" />
+            <NativeTabs.Trigger.Label>Learners</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+        ) : null}
+        {isAdmin ? (
+          <NativeTabs.Trigger name="approvals">
+            <NativeTabs.Trigger.Icon sf="checkmark.seal" />
+            <NativeTabs.Trigger.Label>Approvals</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
         ) : null}
         <NativeTabs.Trigger name="profile">
@@ -62,6 +80,9 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="home-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="skills" options={{ title: "Skills", href: isTrainee ? "/skills" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="format-list-checks" color={color} size={size} /> }} />
       <Tabs.Screen name="career" options={{ title: "Career", href: isTrainee ? "/career" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="target" color={color} size={size} /> }} />
+      <Tabs.Screen name="trainings" options={{ title: "Trainings", href: isTrainer ? "/trainings" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="book-open-variant" color={color} size={size} /> }} />
+      <Tabs.Screen name="learners" options={{ title: "Learners", href: isTrainer ? "/learners" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="approvals" options={{ title: "Approvals", href: isAdmin ? "/approvals" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="check-decagram-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-circle-outline" color={color} size={size} /> }} />
     </Tabs>
   );

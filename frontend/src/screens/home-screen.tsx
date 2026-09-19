@@ -42,7 +42,10 @@ export function HomeScreen() {
         <Text style={styles.title}>{content.title}</Text>
         <Text style={styles.subtitle}>{content.subtitle}</Text>
 
-        {user.role === "TRAINEE" ? <TraineeDashboard /> : <NonTraineePlaceholder />}
+        {user.role === "TRAINEE" ? <TraineeDashboard /> : null}
+        {user.role === "TRAINER" ? <TrainerDashboard /> : null}
+        {user.role === "ADMIN" ? <AdminDashboard /> : null}
+        {user.role === "EMPLOYER" || user.role === "GOVERNMENT" ? <NonTraineePlaceholder /> : null}
       </ScrollView>
     </View>
   );
@@ -133,6 +136,66 @@ function TraineeDashboard() {
       ) : null}
 
       <Link href="/profile" asChild><Text style={styles.profileLink}>Review account and access details →</Text></Link>
+    </View>
+  );
+}
+
+function TrainerDashboard() {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const authed = useAuthedRequest();
+  const trainingsQuery = useQuery({
+    queryKey: ["trainer", "trainings"],
+    queryFn: () => authed<{ length: number }[]>("/trainer/trainings"),
+  });
+  const enrollmentsQuery = useQuery({
+    queryKey: ["trainer", "enrollments"],
+    queryFn: () => authed<{ status: string }[]>("/trainer/enrollments"),
+  });
+  const active = (enrollmentsQuery.data ?? []).filter((e) => e.status === "ENROLLED").length;
+  return (
+    <View>
+      <View style={styles.heroCard}>
+        <View style={styles.heroIcon}><MaterialCommunityIcons name="human-male-board" size={24} color={colors.onBrandPrimary} /></View>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroTitle}>{trainingsQuery.data?.length ?? 0} trainings · {active} active learners</Text>
+          <Text style={styles.heroText}>Publish courses, then verify learner skills — verifications appear on their profiles.</Text>
+        </View>
+      </View>
+      <Text style={styles.sectionTitle}>Quick actions</Text>
+      <View style={styles.grid}>
+        <ActionCard testID="action-new-training" icon="plus-circle-outline" title="New training" text="Publish a course for trainees" onPress={() => router.push("/trainings")} />
+        <ActionCard testID="action-learners" icon="account-group-outline" title="Learners" text="Complete and verify skills" onPress={() => router.push("/learners")} />
+        <ActionCard testID="action-trainer-profile" icon="badge-account-horizontal-outline" title="My profile" text="Headline, skills, institution" onPress={() => router.push("/trainer-profile")} />
+        <ActionCard testID="action-my-trainings" icon="book-open-variant" title="My trainings" text="Edit or close your courses" onPress={() => router.push("/trainings")} />
+      </View>
+    </View>
+  );
+}
+
+function AdminDashboard() {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const authed = useAuthedRequest();
+  const pendingQuery = useQuery({
+    queryKey: ["admin", "pending-users"],
+    queryFn: () => authed<{ length: number }[]>("/admin/pending-users"),
+  });
+  const pending = pendingQuery.data?.length ?? 0;
+  return (
+    <View>
+      <View style={styles.heroCard}>
+        <View style={styles.heroIcon}><MaterialCommunityIcons name="shield-account-outline" size={24} color={colors.onBrandPrimary} /></View>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroTitle}>{pending} account{pending === 1 ? "" : "s"} awaiting verification</Text>
+          <Text style={styles.heroText}>Trainers, employers, and government users need your approval before they can sign in.</Text>
+        </View>
+      </View>
+      <Text style={styles.sectionTitle}>Quick actions</Text>
+      <View style={styles.grid}>
+        <ActionCard testID="action-approvals" icon="check-decagram-outline" title="Verification queue" text="Approve or reject pending accounts" onPress={() => router.push("/approvals")} />
+        <ActionCard testID="action-admin-profile" icon="account-cog-outline" title="Admin profile" text="Session and access details" onPress={() => router.push("/profile")} />
+      </View>
     </View>
   );
 }

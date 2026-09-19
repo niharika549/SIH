@@ -1,11 +1,13 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { Career, RecommendationItem, SkillGap, SkillGapItem, TraineeProfile } from "@/src/api/authed";
+import type { Career, Enrollment, RecommendationItem, SkillGap, SkillGapItem, TraineeProfile } from "@/src/api/authed";
 import { PROFICIENCY_LABEL, useAuthedRequest } from "@/src/api/authed";
+import { ApiError } from "@/src/api/client";
 import { BrandHeader } from "@/src/components/brand-header";
 import { ProficiencyBadge } from "@/src/components/proficiency-badge";
 import { usesNativeTabs } from "@/src/navigation";
@@ -16,6 +18,8 @@ export function CareerScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const authed = useAuthedRequest();
+  const queryClient = useQueryClient();
+  const [enrollError, setEnrollError] = useState("");
 
   const profileQuery = useQuery({ queryKey: ["trainee", "profile"], queryFn: () => authed<TraineeProfile | null>("/trainee/profile") });
   const gapQuery = useQuery({
@@ -34,6 +38,19 @@ export function CareerScreen() {
     queryFn: () => authed<{ items: RecommendationItem[] }>("/trainee/recommendations"),
     enabled: !!profileQuery.data?.career_goal_id,
   });
+  const enrollmentsQuery = useQuery({
+    queryKey: ["trainee", "enrollments"],
+    queryFn: () => authed<Enrollment[]>("/trainee/enrollments"),
+  });
+  const enrollMutation = useMutation({
+    mutationFn: (trainingId: string) =>
+      authed("/trainee/enrollments", { method: "POST", body: { training_id: trainingId } }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["trainee", "enrollments"] }),
+    onError: (e) => setEnrollError(e instanceof ApiError ? e.message : "Unable to enroll right now."),
+  });
+  const enrolledIds = new Set(
+    (enrollmentsQuery.data ?? []).filter((e) => e.status !== "DROPPED").map((e) => e.training_id),
+  );
 
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
 
@@ -96,16 +113,36 @@ export function CareerScreen() {
               <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={colors.brandPrimary} />
               <Text style={styles.recReasonText}>{rec.reason}</Text>
             </View>
-            <Pressable
-              onPress={() => rec.covered_gaps[0] && router.push(`/assessment/${rec.covered_gaps[0]}`)}
-              style={styles.recCta}
-              testID={`recommendation-assess-${rec.training.id}`}
-            >
-              <Text style={styles.recCtaText}>Take a quick assessment for {rec.covered_gaps.length} covered skill{rec.covered_gaps.length > 1 ? "s" : ""}</Text>
-              <MaterialCommunityIcons name="arrow-right" size={16} color={colors.brandPrimary} />
-            </Pressable>
+            <View style={styles.recActions}>
+              <Pressable
+                onPress={() => rec.covered_gaps[0] && router.push(`/assessment/${rec.covered_gaps[0]}`)}
+                style={styles.recCta}
+                testID={`recommendation-assess-${rec.training.id}`}
+              >
+                <MaterialCommunityIcons name="play-circle-outline" size={16} color={colors.brandPrimary} />
+                <Text style={styles.recCtaText}>Quick assess</Text>
+              </Pressable>
+              {enrolledIds.has(rec.training.id) ? (
+                <View style={styles.enrolledPill} testID={`enrolled-${rec.training.id}`}>
+                  <MaterialCommunityIcons name="check-circle" size={14} color={colors.success} />
+                  <Text style={styles.enrolledText}>Enrolled</Text>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => { setEnrollError(""); enrollMutation.mutate(rec.training.id); }}
+                  disabled={enrollMutation.isPending}
+                  style={styles.enrollBtn}
+                  testID={`enroll-${rec.training.id}`}
+                  accessibilityRole="button"
+                >
+                  <MaterialCommunityIcons name="plus-circle-outline" size={16} color={colors.onBrandPrimary} />
+                  <Text style={styles.enrollText}>Enroll</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
         ))}
+        {enrollError ? <Text style={styles.errorText} testID="enroll-error">{enrollError}</Text> : null}
       </ScrollView>
     </View>
   );
@@ -186,6 +223,11 @@ const useStyles = makeStyles((colors) => ({
   metaText: { color: colors.muted, fontSize: 11, fontWeight: "700" },
   recReason: { alignItems: "flex-start", backgroundColor: colors.brandTertiary, borderRadius: 8, flexDirection: "row", gap: 6, padding: 9 },
   recReasonText: { color: colors.onBrandTertiary, flex: 1, fontSize: 12, lineHeight: 17 },
-  recCta: { alignItems: "center", flexDirection: "row", gap: 4, marginTop: 2 },
+  recActions: { alignItems: "center", flexDirection: "row", gap: 10, marginTop: 2 },
+  recCta: { alignItems: "center", flexDirection: "row", gap: 4, paddingVertical: 8 },
   recCtaText: { color: colors.brandPrimary, fontSize: 12, fontWeight: "800" },
+  enrollBtn: { alignItems: "center", backgroundColor: colors.brandPrimary, borderRadius: 10, flexDirection: "row", gap: 5, minHeight: 40, paddingHorizontal: 14 },
+  enrollText: { color: colors.onBrandPrimary, fontSize: 12, fontWeight: "800" },
+  enrolledPill: { alignItems: "center", backgroundColor: colors.surfaceTertiary, borderRadius: 999, flexDirection: "row", gap: 5, paddingHorizontal: 12, paddingVertical: 8 },
+  enrolledText: { color: colors.success, fontSize: 12, fontWeight: "800" },
 }));

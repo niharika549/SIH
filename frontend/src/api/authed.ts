@@ -44,6 +44,53 @@ export type Training = {
   seats: number;
   provider: string;
   is_sample: boolean;
+  provider_user_id?: string | null;
+  status?: "PUBLISHED" | "CLOSED";
+};
+
+export type TrainerProfile = {
+  user_id: string;
+  headline: string;
+  bio: string;
+  specializations: string[];
+  skill_ids: string[];
+  qualifications: string;
+  experience_years: number;
+  institution: string;
+  state_code: string | null;
+  district_code: string | null;
+  availability: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Enrollment = {
+  id: string;
+  trainee_user_id: string;
+  training_id: string;
+  trainer_user_id: string | null;
+  status: "ENROLLED" | "COMPLETED" | "DROPPED";
+  enrolled_at: string;
+  completed_at: string | null;
+  trainer_notes: string;
+  verified_skills: {
+    skill_id: string;
+    level: Proficiency;
+    note: string;
+    verified_at: string;
+    trainer_user_id: string;
+  }[];
+  training?: Training | null;
+  trainee?: { id: string; full_name: string; email: string; state_code?: string | null; district_code?: string | null };
+};
+
+export type PendingUser = {
+  id: string;
+  full_name: string;
+  email: string;
+  role: "TRAINEE" | "TRAINER" | "EMPLOYER" | "GOVERNMENT" | "ADMIN";
+  account_status: "PENDING" | "ACTIVE" | "REJECTED" | "SUSPENDED";
+  created_at: string;
 };
 export type TraineeSkill = {
   skill_id: string;

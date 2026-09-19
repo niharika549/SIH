@@ -163,7 +163,7 @@ async def register(input: RegisterRequest):
         raise HTTPException(status_code=409, detail='An account with this email already exists')
     account_status = (
         AccountStatus.PENDING
-        if input.role in {Role.EMPLOYER, Role.GOVERNMENT}
+        if input.role in {Role.EMPLOYER, Role.GOVERNMENT, Role.TRAINER}
         else AccountStatus.ACTIVE
     )
     document = {
@@ -632,6 +632,366 @@ async def trainee_recommendations(user: dict[str, Any] = Depends(require_trainee
     return {'items': items[:8]}
 
 
+# ============================================================================
+# PHASE 3 — TRAINER PORTAL + ADMIN APPROVAL WORKFLOW
+# ============================================================================
+
+
+class TrainingStatus(str, Enum):
+    PUBLISHED = 'PUBLISHED'
+    CLOSED = 'CLOSED'
+
+
+class EnrollmentStatus(str, Enum):
+    ENROLLED = 'ENROLLED'
+    COMPLETED = 'COMPLETED'
+    DROPPED = 'DROPPED'
+
+
+class TrainerProfileUpsert(BaseModel):
+    headline: str = Field(min_length=2, max_length=120)
+    bio: str = Field(default='', max_length=800)
+    specializations: List[str] = Field(default_factory=list, max_length=20)
+    skill_ids: List[str] = Field(default_factory=list, max_length=30)
+    qualifications: str = Field(default='', max_length=300)
+    experience_years: int = Field(ge=0, le=60)
+    institution: str = Field(default='', max_length=120)
+    state_code: str | None = None
+    district_code: str | None = None
+    availability: str = Field(default='FLEXIBLE', max_length=40)
+
+
+class TrainingSkillInput(BaseModel):
+    skill_id: str
+    target_level: Proficiency
+
+
+class TrainingUpsert(BaseModel):
+    title: str = Field(min_length=3, max_length=120)
+    description: str = Field(min_length=10, max_length=1000)
+    skills: List[TrainingSkillInput] = Field(min_length=1, max_length=10)
+    duration_hours: int = Field(ge=1, le=1000)
+    mode: str = Field(default='ONLINE')
+    seats: int = Field(ge=1, le=10000)
+    status: TrainingStatus = TrainingStatus.PUBLISHED
+
+
+class SkillVerifyInput(BaseModel):
+    skill_id: str
+    level: Proficiency
+    note: str = Field(default='', max_length=300)
+
+
+class EnrollmentCreate(BaseModel):
+    training_id: str
+
+
+class EnrollmentCompleteInput(BaseModel):
+    trainer_notes: str = Field(default='', max_length=500)
+
+
+require_trainer = require_roles(Role.TRAINER)
+require_admin = require_roles(Role.ADMIN)
+
+
+async def _validate_skill_ids(skill_ids: List[str]) -> None:
+    if not skill_ids:
+        return
+    unique = list(set(skill_ids))
+    found = await db.skills.count_documents({'id': {'$in': unique}})
+    if found != len(unique):
+        raise HTTPException(status_code=400, detail='One or more skill_ids are invalid')
+
+
+# ---- Admin approvals -------------------------------------------------------
+
+
+@api_router.get('/admin/pending-users')
+async def admin_pending_users(_user: dict[str, Any] = Depends(require_admin)):
+    return await db.users.find(
+        {'account_status': AccountStatus.PENDING.value},
+        {'_id': 0, 'password_hash': 0},
+    ).sort('created_at', 1).to_list(500)
+
+
+@api_router.get('/admin/users')
+async def admin_list_users(status: str | None = None, _user: dict[str, Any] = Depends(require_admin)):
+    query = {'account_status': status} if status else {}
+    return await db.users.find(query, {'_id': 0, 'password_hash': 0}).sort('created_at', -1).to_list(500)
+
+
+@api_router.post('/admin/users/{user_id}/approve')
+async def admin_approve(user_id: str, _user: dict[str, Any] = Depends(require_admin)):
+    target = await db.users.find_one({'id': user_id}, {'_id': 0})
+    if not target:
+        raise HTTPException(status_code=404, detail='User not found')
+    if target['role'] == Role.ADMIN.value:
+        raise HTTPException(status_code=400, detail='Admin accounts are managed separately')
+    if target['account_status'] not in {
+        AccountStatus.PENDING.value,
+        AccountStatus.REJECTED.value,
+        AccountStatus.SUSPENDED.value,
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot approve account in {target['account_status']} state",
+        )
+    await db.users.update_one({'id': user_id}, {'$set': {'account_status': AccountStatus.ACTIVE.value}})
+    return {'user_id': user_id, 'account_status': AccountStatus.ACTIVE.value}
+
+
+@api_router.post('/admin/users/{user_id}/reject')
+async def admin_reject(user_id: str, _user: dict[str, Any] = Depends(require_admin)):
+    target = await db.users.find_one({'id': user_id}, {'_id': 0})
+    if not target:
+        raise HTTPException(status_code=404, detail='User not found')
+    if target['role'] == Role.ADMIN.value:
+        raise HTTPException(status_code=400, detail='Admin accounts are managed separately')
+    await db.users.update_one({'id': user_id}, {'$set': {'account_status': AccountStatus.REJECTED.value}})
+    return {'user_id': user_id, 'account_status': AccountStatus.REJECTED.value}
+
+
+# ---- Trainer profile -------------------------------------------------------
+
+
+@api_router.get('/trainer/profile')
+async def trainer_profile(user: dict[str, Any] = Depends(require_trainer)):
+    return await db.trainer_profiles.find_one({'user_id': user['id']}, {'_id': 0})
+
+
+@api_router.post('/trainer/profile')
+async def upsert_trainer_profile(input: TrainerProfileUpsert, user: dict[str, Any] = Depends(require_trainer)):
+    await _validate_skill_ids(input.skill_ids)
+    now = datetime.now(timezone.utc).isoformat()
+    payload = {**input.model_dump(), 'user_id': user['id'], 'updated_at': now}
+    await db.trainer_profiles.update_one(
+        {'user_id': user['id']},
+        {'$set': payload, '$setOnInsert': {'created_at': now}},
+        upsert=True,
+    )
+    await db.users.update_one({'id': user['id']}, {'$set': {
+        'profile_complete': True,
+        'state_code': input.state_code,
+        'district_code': input.district_code,
+    }})
+    return {**payload, 'created_at': now}
+
+
+# ---- Trainer trainings -----------------------------------------------------
+
+
+@api_router.get('/trainer/trainings')
+async def trainer_trainings(user: dict[str, Any] = Depends(require_trainer)):
+    return await db.trainings.find(
+        {'provider_user_id': user['id']}, {'_id': 0},
+    ).sort('created_at', -1).to_list(200)
+
+
+@api_router.post('/trainer/trainings', status_code=201)
+async def create_training(input: TrainingUpsert, user: dict[str, Any] = Depends(require_trainer)):
+    await _validate_skill_ids([s.skill_id for s in input.skills])
+    now = datetime.now(timezone.utc).isoformat()
+    prof = await db.trainer_profiles.find_one({'user_id': user['id']}, {'_id': 0})
+    doc = {
+        'id': str(uuid.uuid4()),
+        'title': input.title.strip(),
+        'description': input.description.strip(),
+        'skills': [s.model_dump() for s in input.skills],
+        'duration_hours': input.duration_hours,
+        'mode': input.mode,
+        'seats': input.seats,
+        'provider': (prof or {}).get('institution') or user['full_name'],
+        'provider_user_id': user['id'],
+        'status': input.status.value,
+        'is_sample': False,
+        'created_at': now,
+        'updated_at': now,
+    }
+    await db.trainings.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
+
+
+@api_router.patch('/trainer/trainings/{training_id}')
+async def update_training(training_id: str, input: TrainingUpsert, user: dict[str, Any] = Depends(require_trainer)):
+    existing = await db.trainings.find_one(
+        {'id': training_id, 'provider_user_id': user['id']}, {'_id': 0},
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail='Training not found')
+    await _validate_skill_ids([s.skill_id for s in input.skills])
+    payload = {
+        'title': input.title.strip(),
+        'description': input.description.strip(),
+        'skills': [s.model_dump() for s in input.skills],
+        'duration_hours': input.duration_hours,
+        'mode': input.mode,
+        'seats': input.seats,
+        'status': input.status.value,
+        'updated_at': datetime.now(timezone.utc).isoformat(),
+    }
+    await db.trainings.update_one({'id': training_id}, {'$set': payload})
+    return {**existing, **payload}
+
+
+# ---- Trainee enrollments ---------------------------------------------------
+
+
+@api_router.get('/trainee/enrollments')
+async def list_trainee_enrollments(user: dict[str, Any] = Depends(require_trainee)):
+    enrolls = await db.enrollments.find(
+        {'trainee_user_id': user['id']}, {'_id': 0},
+    ).sort('enrolled_at', -1).to_list(200)
+    if not enrolls:
+        return []
+    training_ids = list({e['training_id'] for e in enrolls})
+    trainings_by_id = {
+        t['id']: t for t in
+        await db.trainings.find({'id': {'$in': training_ids}}, {'_id': 0}).to_list(200)
+    }
+    for e in enrolls:
+        e['training'] = trainings_by_id.get(e['training_id'])
+    return enrolls
+
+
+@api_router.post('/trainee/enrollments', status_code=201)
+async def create_enrollment(input: EnrollmentCreate, user: dict[str, Any] = Depends(require_trainee)):
+    training = await db.trainings.find_one({'id': input.training_id}, {'_id': 0})
+    if not training:
+        raise HTTPException(status_code=404, detail='Training not found')
+    if training.get('status') == TrainingStatus.CLOSED.value:
+        raise HTTPException(status_code=400, detail='Training is closed for new enrollments')
+    existing = await db.enrollments.find_one(
+        {'trainee_user_id': user['id'], 'training_id': input.training_id}, {'_id': 0},
+    )
+    if existing and existing['status'] != EnrollmentStatus.DROPPED.value:
+        raise HTTPException(status_code=409, detail=f"Already enrolled ({existing['status']})")
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        'id': str(uuid.uuid4()),
+        'trainee_user_id': user['id'],
+        'training_id': input.training_id,
+        'trainer_user_id': training.get('provider_user_id'),
+        'status': EnrollmentStatus.ENROLLED.value,
+        'enrolled_at': now,
+        'completed_at': None,
+        'trainer_notes': '',
+        'verified_skills': [],
+    }
+    await db.enrollments.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
+
+
+# ---- Trainer enrollments + verification ------------------------------------
+
+
+@api_router.get('/trainer/enrollments')
+async def list_trainer_enrollments(user: dict[str, Any] = Depends(require_trainer)):
+    trainings = await db.trainings.find(
+        {'provider_user_id': user['id']}, {'_id': 0},
+    ).to_list(500)
+    training_ids = [t['id'] for t in trainings]
+    if not training_ids:
+        return []
+    enrolls = await db.enrollments.find(
+        {'training_id': {'$in': training_ids}}, {'_id': 0},
+    ).sort('enrolled_at', -1).to_list(500)
+    if not enrolls:
+        return []
+    trainings_by_id = {t['id']: t for t in trainings}
+    trainee_ids = list({e['trainee_user_id'] for e in enrolls})
+    trainees_by_id = {
+        u['id']: u for u in await db.users.find(
+            {'id': {'$in': trainee_ids}}, {'_id': 0, 'password_hash': 0},
+        ).to_list(500)
+    }
+    for e in enrolls:
+        e['training'] = trainings_by_id.get(e['training_id'])
+        t = trainees_by_id.get(e['trainee_user_id']) or {}
+        e['trainee'] = {
+            'id': t.get('id'),
+            'full_name': t.get('full_name'),
+            'email': t.get('email'),
+            'state_code': t.get('state_code'),
+            'district_code': t.get('district_code'),
+        }
+    return enrolls
+
+
+@api_router.post('/trainer/enrollments/{enrollment_id}/verify-skill')
+async def trainer_verify_skill(
+    enrollment_id: str,
+    input: SkillVerifyInput,
+    user: dict[str, Any] = Depends(require_trainer),
+):
+    enroll = await db.enrollments.find_one({'id': enrollment_id}, {'_id': 0})
+    if not enroll:
+        raise HTTPException(status_code=404, detail='Enrollment not found')
+    training = await db.trainings.find_one({'id': enroll['training_id']}, {'_id': 0})
+    if not training or training.get('provider_user_id') != user['id']:
+        raise HTTPException(status_code=403, detail='You do not own this training')
+    covered_ids = {s['skill_id'] for s in training.get('skills', [])}
+    if input.skill_id not in covered_ids:
+        raise HTTPException(status_code=400, detail='Skill is not covered by this training')
+    now = datetime.now(timezone.utc).isoformat()
+    verified_entry = {
+        'skill_id': input.skill_id,
+        'level': input.level.value,
+        'note': input.note,
+        'verified_at': now,
+        'trainer_user_id': user['id'],
+    }
+    await db.enrollments.update_one(
+        {'id': enrollment_id},
+        {'$pull': {'verified_skills': {'skill_id': input.skill_id}}},
+    )
+    await db.enrollments.update_one(
+        {'id': enrollment_id},
+        {'$push': {'verified_skills': verified_entry}},
+    )
+    await db.trainee_skills.update_one(
+        {'user_id': enroll['trainee_user_id'], 'skill_id': input.skill_id},
+        {'$set': {
+            'user_id': enroll['trainee_user_id'],
+            'skill_id': input.skill_id,
+            'level': input.level.value,
+            'source': SkillSource.TRAINER_VERIFIED.value,
+            'updated_at': now,
+            'verified_by': user['id'],
+        }},
+        upsert=True,
+    )
+    return {'enrollment_id': enrollment_id, 'verified': verified_entry}
+
+
+@api_router.post('/trainer/enrollments/{enrollment_id}/complete')
+async def trainer_complete_enrollment(
+    enrollment_id: str,
+    input: EnrollmentCompleteInput,
+    user: dict[str, Any] = Depends(require_trainer),
+):
+    enroll = await db.enrollments.find_one({'id': enrollment_id}, {'_id': 0})
+    if not enroll:
+        raise HTTPException(status_code=404, detail='Enrollment not found')
+    training = await db.trainings.find_one({'id': enroll['training_id']}, {'_id': 0})
+    if not training or training.get('provider_user_id') != user['id']:
+        raise HTTPException(status_code=403, detail='You do not own this training')
+    now = datetime.now(timezone.utc).isoformat()
+    await db.enrollments.update_one(
+        {'id': enrollment_id},
+        {'$set': {
+            'status': EnrollmentStatus.COMPLETED.value,
+            'completed_at': now,
+            'trainer_notes': input.trainer_notes,
+        }},
+    )
+    return {'enrollment_id': enrollment_id, 'status': EnrollmentStatus.COMPLETED.value, 'completed_at': now}
+
+
+
+
+
 
 
 # Include the router in the main app
@@ -662,6 +1022,10 @@ async def ensure_indexes():
     await db.careers.create_index('id', unique=True)
     await db.questions.create_index([('skill_id', 1), ('difficulty', 1)])
     await db.trainings.create_index('id', unique=True)
+    await db.trainings.create_index('provider_user_id')
+    await db.trainer_profiles.create_index('user_id', unique=True)
+    await db.enrollments.create_index([('trainee_user_id', 1), ('training_id', 1)])
+    await db.enrollments.create_index('training_id')
 
 
 @app.on_event("shutdown")
