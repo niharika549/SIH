@@ -86,3 +86,5 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+# Project backup
+frontend_backup/
