@@ -692,6 +692,7 @@ class EnrollmentCompleteInput(BaseModel):
 
 require_trainer = require_roles(Role.TRAINER)
 require_admin = require_roles(Role.ADMIN)
+require_government = require_roles(Role.GOVERNMENT, Role.ADMIN)
 
 
 async def _validate_skill_ids(skill_ids: List[str]) -> None:
@@ -996,7 +997,109 @@ async def trainer_complete_enrollment(
 
 # Include the router in the main app
 app.include_router(api_router)
+# ============================================================================
+# GOVERNMENT MODULE — DASHBOARD & ANALYTICS
+# ============================================================================
 
+@api_router.get('/government/dashboard')
+async def government_dashboard(
+    user: dict[str, Any] = Depends(require_government),
+):
+    total_users = await db.users.count_documents({})
+
+    total_trainees = await db.users.count_documents({
+        'role': Role.TRAINEE.value
+    })
+
+    total_trainers = await db.users.count_documents({
+        'role': Role.TRAINER.value
+    })
+
+    total_employers = await db.users.count_documents({
+        'role': Role.EMPLOYER.value
+    })
+
+    total_trainings = await db.trainings.count_documents({})
+    total_enrollments = await db.enrollments.count_documents({})
+
+    completed_enrollments = await db.enrollments.count_documents({
+        'status': EnrollmentStatus.COMPLETED.value
+    })
+
+    active_enrollments = await db.enrollments.count_documents({
+        'status': EnrollmentStatus.ENROLLED.value
+    })
+
+    return {
+        'role': user['role'],
+        'statistics': {
+            'total_users': total_users,
+            'total_trainees': total_trainees,
+            'total_trainers': total_trainers,
+            'total_employers': total_employers,
+            'total_trainings': total_trainings,
+            'total_enrollments': total_enrollments,
+            'completed_enrollments': completed_enrollments,
+            'active_enrollments': active_enrollments,
+        }
+    }
+
+
+@api_router.get('/government/district-analytics')
+async def government_district_analytics(
+    _user: dict[str, Any] = Depends(require_government),
+):
+    pipeline = [
+        {
+            '$group': {
+                '_id': {
+                    'state_code': '$state_code',
+                    'district_code': '$district_code',
+                },
+                'trainee_count': {'$sum': 1},
+            }
+        },
+        {
+            '$sort': {
+                'trainee_count': -1
+            }
+        }
+    ]
+
+    results = await db.users.aggregate(pipeline).to_list(500)
+
+    return [
+        {
+            'state_code': item['_id'].get('state_code'),
+            'district_code': item['_id'].get('district_code'),
+            'trainee_count': item['trainee_count'],
+        }
+        for item in results
+    ]
+
+
+@api_router.get('/government/training-analytics')
+async def government_training_analytics(
+    _user: dict[str, Any] = Depends(require_government),
+):
+    pipeline = [
+        {
+            '$group': {
+                '_id': '$status',
+                'count': {'$sum': 1},
+            }
+        }
+    ]
+
+    results = await db.trainings.aggregate(pipeline).to_list(100)
+
+    return [
+        {
+            'status': item['_id'],
+            'count': item['count'],
+        }
+        for item in results
+    ]
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
