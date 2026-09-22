@@ -989,6 +989,332 @@ async def trainer_complete_enrollment(
     return {'enrollment_id': enrollment_id, 'status': EnrollmentStatus.COMPLETED.value, 'completed_at': now}
 
 
+# ============================================================================
+# PHASE 4 — EMPLOYER PORTAL & RECRUITMENT   (Member 2)
+# Paste this whole block into server.py, directly ABOVE this line:
+#     # Include the router in the main app
+#     app.include_router(api_router)
+# ============================================================================
+
+
+class JobStatus(str, Enum):
+    OPEN = 'OPEN'
+    CLOSED = 'CLOSED'
+
+
+class ApplicationStatus(str, Enum):
+    APPLIED = 'APPLIED'
+    SHORTLISTED = 'SHORTLISTED'
+    INTERVIEW = 'INTERVIEW'
+    SELECTED = 'SELECTED'
+    REJECTED = 'REJECTED'
+
+
+class EmployerProfileUpsert(BaseModel):
+    company_name: str = Field(min_length=2, max_length=150)
+    industry: str = Field(default='', max_length=100)
+    company_size: str = Field(default='', max_length=40)
+    website: str = Field(default='', max_length=200)
+    logo_url: str = Field(default='', max_length=500)
+    about: str = Field(default='', max_length=1000)
+    state_code: str | None = None
+    district_code: str | None = None
+
+
+class JobSkillInput(BaseModel):
+    skill_id: str
+    required_level: Proficiency
+
+
+class JobUpsert(BaseModel):
+    title: str = Field(min_length=3, max_length=120)
+    description: str = Field(min_length=10, max_length=2000)
+    skills: List[JobSkillInput] = Field(min_length=1, max_length=15)
+    location: str = Field(default='', max_length=150)
+    salary_min: int | None = Field(default=None, ge=0)
+    salary_max: int | None = Field(default=None, ge=0)
+    experience_years: int = Field(default=0, ge=0, le=50)
+    qualification: str = Field(default='', max_length=200)
+    openings: int = Field(default=1, ge=1, le=1000)
+    expiry_date: str | None = None  # ISO date string, e.g. '2026-12-31'
+    status: JobStatus = JobStatus.OPEN
+
+
+class ApplicationStatusUpdate(BaseModel):
+    status: ApplicationStatus
+    feedback: str = Field(default='', max_length=500)
+
+
+require_employer = require_roles(Role.EMPLOYER)
+
+
+# ---- Employer profile -------------------------------------------------------
+
+
+@api_router.get('/employer/profile')
+async def employer_profile(user: dict[str, Any] = Depends(require_employer)):
+    return await db.employer_profiles.find_one({'user_id': user['id']}, {'_id': 0})
+
+
+@api_router.post('/employer/profile')
+async def upsert_employer_profile(input: EmployerProfileUpsert, user: dict[str, Any] = Depends(require_employer)):
+    now = datetime.now(timezone.utc).isoformat()
+    payload = {**input.model_dump(), 'user_id': user['id'], 'updated_at': now}
+    await db.employer_profiles.update_one(
+        {'user_id': user['id']},
+        {'$set': payload, '$setOnInsert': {'created_at': now}},
+        upsert=True,
+    )
+    await db.users.update_one({'id': user['id']}, {'$set': {
+        'profile_complete': True,
+        'state_code': input.state_code,
+        'district_code': input.district_code,
+    }})
+    return {**payload, 'created_at': now}
+
+
+# ---- Job management (employer side) -----------------------------------------
+
+
+@api_router.get('/employer/jobs')
+async def employer_jobs(user: dict[str, Any] = Depends(require_employer)):
+    return await db.jobs.find(
+        {'employer_user_id': user['id']}, {'_id': 0},
+    ).sort('created_at', -1).to_list(200)
+
+
+@api_router.post('/employer/jobs', status_code=201)
+async def create_job(input: JobUpsert, user: dict[str, Any] = Depends(require_employer)):
+    await _validate_skill_ids([s.skill_id for s in input.skills])
+    now = datetime.now(timezone.utc).isoformat()
+    prof = await db.employer_profiles.find_one({'user_id': user['id']}, {'_id': 0})
+    doc = {
+        'id': str(uuid.uuid4()),
+        'title': input.title.strip(),
+        'description': input.description.strip(),
+        'skills': [s.model_dump() for s in input.skills],
+        'location': input.location,
+        'salary_min': input.salary_min,
+        'salary_max': input.salary_max,
+        'experience_years': input.experience_years,
+        'qualification': input.qualification,
+        'openings': input.openings,
+        'expiry_date': input.expiry_date,
+        'company_name': (prof or {}).get('company_name') or user['full_name'],
+        'employer_user_id': user['id'],
+        'status': input.status.value,
+        'created_at': now,
+        'updated_at': now,
+    }
+    await db.jobs.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
+
+
+@api_router.patch('/employer/jobs/{job_id}')
+async def update_job(job_id: str, input: JobUpsert, user: dict[str, Any] = Depends(require_employer)):
+    existing = await db.jobs.find_one({'id': job_id, 'employer_user_id': user['id']}, {'_id': 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail='Job not found')
+    await _validate_skill_ids([s.skill_id for s in input.skills])
+    payload = {
+        'title': input.title.strip(),
+        'description': input.description.strip(),
+        'skills': [s.model_dump() for s in input.skills],
+        'location': input.location,
+        'salary_min': input.salary_min,
+        'salary_max': input.salary_max,
+        'experience_years': input.experience_years,
+        'qualification': input.qualification,
+        'openings': input.openings,
+        'expiry_date': input.expiry_date,
+        'status': input.status.value,
+        'updated_at': datetime.now(timezone.utc).isoformat(),
+    }
+    await db.jobs.update_one({'id': job_id}, {'$set': payload})
+    return {**existing, **payload}
+
+
+@api_router.post('/employer/jobs/{job_id}/close')
+async def close_job(job_id: str, user: dict[str, Any] = Depends(require_employer)):
+    existing = await db.jobs.find_one({'id': job_id, 'employer_user_id': user['id']}, {'_id': 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail='Job not found')
+    await db.jobs.update_one({'id': job_id}, {'$set': {
+        'status': JobStatus.CLOSED.value,
+        'updated_at': datetime.now(timezone.utc).isoformat(),
+    }})
+    return {'id': job_id, 'status': JobStatus.CLOSED.value}
+
+
+# ---- Job browsing + applying (trainee side) ----------------------------------
+
+
+@api_router.get('/trainee/jobs')
+async def browse_jobs(skill_id: str | None = None, _user: dict[str, Any] = Depends(current_user)):
+    query: dict[str, Any] = {'status': JobStatus.OPEN.value}
+    if skill_id:
+        query['skills.skill_id'] = skill_id
+    return await db.jobs.find(query, {'_id': 0}).sort('created_at', -1).to_list(300)
+
+
+@api_router.get('/trainee/jobs/{job_id}')
+async def job_detail(job_id: str, _user: dict[str, Any] = Depends(current_user)):
+    job = await db.jobs.find_one({'id': job_id}, {'_id': 0})
+    if not job:
+        raise HTTPException(status_code=404, detail='Job not found')
+    return job
+
+
+@api_router.post('/trainee/jobs/{job_id}/apply', status_code=201)
+async def apply_to_job(job_id: str, user: dict[str, Any] = Depends(require_trainee)):
+    job = await db.jobs.find_one({'id': job_id}, {'_id': 0})
+    if not job:
+        raise HTTPException(status_code=404, detail='Job not found')
+    if job['status'] != JobStatus.OPEN.value:
+        raise HTTPException(status_code=400, detail='This job is no longer accepting applications')
+    existing = await db.applications.find_one(
+        {'trainee_user_id': user['id'], 'job_id': job_id}, {'_id': 0},
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Already applied ({existing['status']})")
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        'id': str(uuid.uuid4()),
+        'job_id': job_id,
+        'employer_user_id': job['employer_user_id'],
+        'trainee_user_id': user['id'],
+        'status': ApplicationStatus.APPLIED.value,
+        'feedback': '',
+        'applied_at': now,
+        'updated_at': now,
+    }
+    await db.applications.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
+
+
+@api_router.get('/trainee/applications')
+async def trainee_applications(user: dict[str, Any] = Depends(require_trainee)):
+    apps = await db.applications.find(
+        {'trainee_user_id': user['id']}, {'_id': 0},
+    ).sort('applied_at', -1).to_list(300)
+    if not apps:
+        return []
+    job_ids = list({a['job_id'] for a in apps})
+    jobs_by_id = {j['id']: j for j in await db.jobs.find({'id': {'$in': job_ids}}, {'_id': 0}).to_list(300)}
+    for a in apps:
+        a['job'] = jobs_by_id.get(a['job_id'])
+    return apps
+
+
+# ---- Applications (employer side) --------------------------------------------
+
+
+@api_router.get('/employer/jobs/{job_id}/applications')
+async def job_applications(job_id: str, user: dict[str, Any] = Depends(require_employer)):
+    job = await db.jobs.find_one({'id': job_id, 'employer_user_id': user['id']}, {'_id': 0})
+    if not job:
+        raise HTTPException(status_code=404, detail='Job not found')
+    apps = await db.applications.find({'job_id': job_id}, {'_id': 0}).sort('applied_at', -1).to_list(500)
+    if not apps:
+        return []
+    trainee_ids = list({a['trainee_user_id'] for a in apps})
+    trainees_by_id = {
+        u['id']: u for u in await db.users.find(
+            {'id': {'$in': trainee_ids}}, {'_id': 0, 'password_hash': 0},
+        ).to_list(500)
+    }
+    skills_by_user: dict[str, list] = {}
+    for row in await db.trainee_skills.find({'user_id': {'$in': trainee_ids}}, {'_id': 0}).to_list(2000):
+        skills_by_user.setdefault(row['user_id'], []).append(row)
+    for a in apps:
+        t = trainees_by_id.get(a['trainee_user_id']) or {}
+        a['trainee'] = {
+            'id': t.get('id'),
+            'full_name': t.get('full_name'),
+            'email': t.get('email'),
+            'state_code': t.get('state_code'),
+            'district_code': t.get('district_code'),
+        }
+        a['trainee_skills'] = skills_by_user.get(a['trainee_user_id'], [])
+    return apps
+
+
+@api_router.patch('/employer/applications/{application_id}/status')
+async def update_application_status(
+    application_id: str,
+    input: ApplicationStatusUpdate,
+    user: dict[str, Any] = Depends(require_employer),
+):
+    app_doc = await db.applications.find_one(
+        {'id': application_id, 'employer_user_id': user['id']}, {'_id': 0},
+    )
+    if not app_doc:
+        raise HTTPException(status_code=404, detail='Application not found')
+    now = datetime.now(timezone.utc).isoformat()
+    await db.applications.update_one(
+        {'id': application_id},
+        {'$set': {'status': input.status.value, 'feedback': input.feedback, 'updated_at': now}},
+    )
+    return {'id': application_id, 'status': input.status.value, 'feedback': input.feedback}
+
+
+# ---- Candidate matching -------------------------------------------------------
+# Placeholder scoring using existing trainee_skills, so your matching UI has
+# something real to call today. Swap the URL to Member 3's
+# GET /api/matching/candidates/{job_id} once it ships — keep this response
+# shape (match_percentage + breakdown) so the frontend screen doesn't change.
+
+
+def _skill_match_score(job_skills: list[dict], trainee_skills: list[dict]) -> dict:
+    trainee_by_id = {s['skill_id']: s['level'] for s in trainee_skills}
+    matched = 0
+    breakdown = []
+    for js in job_skills:
+        level = trainee_by_id.get(js['skill_id'], 'NONE')
+        ok = PROFICIENCY_RANK.get(level, 0) >= PROFICIENCY_RANK[js['required_level']]
+        if ok:
+            matched += 1
+        breakdown.append({
+            'skill_id': js['skill_id'],
+            'required_level': js['required_level'],
+            'candidate_level': level,
+            'met': ok,
+        })
+    pct = round(100.0 * matched / len(job_skills), 1) if job_skills else 0.0
+    return {'match_percentage': pct, 'breakdown': breakdown}
+
+
+@api_router.get('/employer/jobs/{job_id}/matches')
+async def job_candidate_matches(job_id: str, user: dict[str, Any] = Depends(require_employer)):
+    job = await db.jobs.find_one({'id': job_id, 'employer_user_id': user['id']}, {'_id': 0})
+    if not job:
+        raise HTTPException(status_code=404, detail='Job not found')
+    skill_ids = [s['skill_id'] for s in job['skills']]
+    trainee_ids = await db.trainee_skills.distinct('user_id', {'skill_id': {'$in': skill_ids}})
+    if not trainee_ids:
+        return []
+    trainees = await db.users.find(
+        {'id': {'$in': trainee_ids}, 'role': Role.TRAINEE.value}, {'_id': 0, 'password_hash': 0},
+    ).to_list(500)
+    skills_by_user: dict[str, list] = {}
+    for row in await db.trainee_skills.find({'user_id': {'$in': trainee_ids}}, {'_id': 0}).to_list(3000):
+        skills_by_user.setdefault(row['user_id'], []).append(row)
+    results = []
+    for t in trainees:
+        result = _skill_match_score(job['skills'], skills_by_user.get(t['id'], []))
+        if result['match_percentage'] <= 0:
+            continue
+        results.append({
+            'trainee': {
+                'id': t['id'], 'full_name': t['full_name'], 'email': t['email'],
+                'state_code': t.get('state_code'), 'district_code': t.get('district_code'),
+            },
+            **result,
+        })
+    results.sort(key=lambda r: r['match_percentage'], reverse=True)
+    return results[:50]
 
 
 
@@ -1026,6 +1352,11 @@ async def ensure_indexes():
     await db.trainer_profiles.create_index('user_id', unique=True)
     await db.enrollments.create_index([('trainee_user_id', 1), ('training_id', 1)])
     await db.enrollments.create_index('training_id')
+    await db.employer_profiles.create_index('user_id', unique=True)
+    await db.jobs.create_index('id', unique=True)
+    await db.jobs.create_index('employer_user_id')
+    await db.applications.create_index([('trainee_user_id', 1), ('job_id', 1)], unique=True)
+    await db.applications.create_index('job_id')
 
 
 @app.on_event("shutdown")
