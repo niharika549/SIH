@@ -1,3 +1,4 @@
+from fastapi.middleware.cors import CORSMiddleware
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from typing import Any, List
@@ -33,6 +34,18 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 # Create the main app
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://localhost:8082",
+        "http://127.0.0.1:8082",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")

@@ -1,1302 +1,1147 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
   ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
   View,
+  Text,
+  Pressable,
+  StyleSheet,
 } from "react-native";
+import MaterialCommunityIcons from
+  "@expo/vector-icons/MaterialCommunityIcons";
 
-import { useAuthedRequest } from "@/src/api/authed";
+import { makeStyles, useTheme } from "../src/theme";
 
-type DashboardStats = {
-  total_users: number;
-  total_trainees: number;
-  total_trainers: number;
-  total_employers: number;
-  total_trainings: number;
-  total_enrollments: number;
-  active_enrollments: number;
-  completed_enrollments: number;
+type FilterType = "district" | "career" | "period" | null;
+
+type ReportSectionProps = {
+  title: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  children: React.ReactNode;
 };
 
-type DashboardResponse = {
-  statistics?: DashboardStats;
-};
-
-type District = {
-  state_code?: string;
-  district_code?: string;
-  trainees?: number;
-  trainers?: number;
-  employers?: number;
-  trainings?: number;
-};
-
-type DistrictResponse = {
-  districts?: District[];
-};
-
-type Skill = {
-  skill_id: string;
-  skill_name: string;
-  trainee_count?: number;
-  training_count?: number;
-  enrollment_count?: number;
-};
-
-type SkillResponse = {
-  skills?: Skill[];
-};
-
-type SummaryData = {
-  total_districts?: number;
-  total_skills?: number;
-  total_trainee_skill_records?: number;
-};
-
-type SummaryResponse = {
-  summary?: SummaryData;
-};
-
-type TrainingAnalytics = {
-  total_trainings: number;
-  total_capacity: number;
-  used_capacity: number;
-  available_capacity: number;
-  total_enrollments: number;
-  active_enrollments: number;
-  completed_enrollments: number;
-  utilization_rate: number;
-  completion_rate: number;
-};
-
-type JobPlacementAnalytics = {
-  summary?: {
-    total_jobs: number;
-    total_openings: number;
-    total_applications: number;
-    total_placements: number;
-    placement_rate: number;
-  };
-
-  districts?: {
-    district_code: string;
-    jobs: number;
-    openings: number;
-    placements: number;
-  }[];
-
-  careers?: {
-    career_id: string;
-    career_name: string;
-    jobs: number;
-    openings: number;
-    placements: number;
-  }[];
-};
-
-type CareerOption = {
-  id: string;
+type BarItem = {
   name: string;
+  value: number;
+  district?: string;
+  career?: string;
 };
 
 export default function GovernmentReports() {
-  const authed = useAuthedRequest();
+  const { colors } = useTheme();
+  const styles = useStyles();
 
-  // -----------------------------
-  // FILTER STATE
-  // -----------------------------
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [selectedCareerId, setSelectedCareerId] = useState("");
+  // FILTER STATES
+  const [district, setDistrict] = useState("All Districts");
+  const [career, setCareer] = useState("All Careers");
+  const [period, setPeriod] = useState("This Year");
 
-  const [appliedFilters, setAppliedFilters] = useState({
-    dateFrom: "",
-    dateTo: "",
-    districtCode: "",
-    careerId: "",
-  });
+  const [filterOpen, setFilterOpen] = useState<FilterType>(null);
 
-  // -----------------------------
-  // DASHBOARD
-  // -----------------------------
-  const dashboardQuery = useQuery({
-    queryKey: ["government", "dashboard"],
-    queryFn: () =>
-      authed<DashboardResponse>("/government/dashboard"),
-    retry: false,
-  });
+  const districts = [
+    "All Districts",
+    "Guntur",
+    "Vijayawada",
+    "Visakhapatnam",
+    "Nellore",
+  ];
 
-  // -----------------------------
-  // DISTRICT ANALYTICS
-  // -----------------------------
-  const districtQuery = useQuery({
-    queryKey: ["government", "district-analytics"],
-    queryFn: () =>
-      authed<DistrictResponse>(
-        "/government/district-analytics"
-      ),
-    retry: false,
-  });
+  const careers = [
+    "All Careers",
+    "Data Scientist",
+    "AI Engineer",
+    "Cloud Engineer",
+    "Web Developer",
+  ];
 
-  // -----------------------------
-  // CAREERS
-  // -----------------------------
-  const careersQuery = useQuery({
-    queryKey: ["catalog", "careers"],
-    queryFn: () =>
-      authed<CareerOption[]>("/catalog/careers"),
-    retry: false,
-  });
+  const periods = [
+    "This Year",
+    "This Month",
+    "Last 6 Months",
+  ];
 
-  // -----------------------------
-  // SKILL ANALYTICS
-  // -----------------------------
-  const skillQuery = useQuery({
-    queryKey: ["government", "skill-analytics"],
-    queryFn: () =>
-      authed<SkillResponse>(
-        "/government/skill-analytics"
-      ),
-    retry: false,
-  });
-
-  // -----------------------------
-  // ANALYTICS SUMMARY
-  // -----------------------------
-  const summaryQuery = useQuery({
-    queryKey: ["government", "analytics-summary"],
-    queryFn: () =>
-      authed<SummaryResponse>(
-        "/government/analytics-summary"
-      ),
-    retry: false,
-  });
-
-  // -----------------------------
-  // TRAINING ANALYTICS
-  // -----------------------------
-  const trainingQuery = useQuery({
-    queryKey: ["government", "training-analytics"],
-    queryFn: () =>
-      authed<TrainingAnalytics>(
-        "/government/training-analytics"
-      ),
-    retry: false,
-  });
-
-  // -----------------------------
-  // JOB + PLACEMENT ANALYTICS
-  // -----------------------------
-  const jobPlacementQuery = useQuery({
-    queryKey: [
-      "government",
-      "job-placement-analytics",
-      appliedFilters,
-    ],
-
-    queryFn: () => {
-      const queryParts: string[] = [];
-
-      if (appliedFilters.dateFrom) {
-        queryParts.push(
-          `date_from=${encodeURIComponent(
-            appliedFilters.dateFrom
-          )}`
-        );
-      }
-
-      if (appliedFilters.dateTo) {
-        queryParts.push(
-          `date_to=${encodeURIComponent(
-            appliedFilters.dateTo
-          )}`
-        );
-      }
-
-      if (appliedFilters.districtCode) {
-        queryParts.push(
-          `district_code=${encodeURIComponent(
-            appliedFilters.districtCode
-          )}`
-        );
-      }
-
-      if (appliedFilters.careerId) {
-        queryParts.push(
-          `career_id=${encodeURIComponent(
-            appliedFilters.careerId
-          )}`
-        );
-      }
-
-      const queryString =
-        queryParts.length > 0
-          ? `?${queryParts.join("&")}`
-          : "";
-
-      return authed<JobPlacementAnalytics>(
-        `/government/job-placement-analytics${queryString}`
-      );
+  // DEMO REPORT DATA
+  const districtData: BarItem[] = [
+    {
+      name: "Guntur",
+      value: 85,
+      district: "Guntur",
+      career: "Data Scientist",
     },
+    {
+      name: "Vijayawada",
+      value: 72,
+      district: "Vijayawada",
+      career: "AI Engineer",
+    },
+    {
+      name: "Visakhapatnam",
+      value: 65,
+      district: "Visakhapatnam",
+      career: "Cloud Engineer",
+    },
+    {
+      name: "Nellore",
+      value: 48,
+      district: "Nellore",
+      career: "Web Developer",
+    },
+  ];
 
-    retry: false,
-  });
+  const careerData: BarItem[] = [
+    {
+      name: "Data Scientist",
+      value: 90,
+      career: "Data Scientist",
+    },
+    {
+      name: "AI Engineer",
+      value: 78,
+      career: "AI Engineer",
+    },
+    {
+      name: "Cloud Engineer",
+      value: 65,
+      career: "Cloud Engineer",
+    },
+    {
+      name: "Web Developer",
+      value: 55,
+      career: "Web Developer",
+    },
+  ];
 
-  // -----------------------------
-  // LOADING
-  // -----------------------------
-  const loading =
-    dashboardQuery.isPending ||
-    districtQuery.isPending ||
-    careersQuery.isPending ||
-    skillQuery.isPending ||
-    summaryQuery.isPending ||
-    trainingQuery.isPending ||
-    jobPlacementQuery.isPending;
+  const skillData = [
+    { name: "Python", value: 92 },
+    { name: "SQL", value: 84 },
+    { name: "Machine Learning", value: 76 },
+    { name: "Cloud Computing", value: 68 },
+    { name: "React", value: 60 },
+  ];
 
-  if (loading) {
+  // APPLY FILTERS TO DEMO DATA
+  const filteredDistrictData = useMemo(() => {
+    return districtData.filter((item) => {
+      const districtMatch =
+        district === "All Districts" ||
+        item.district === district;
+
+      const careerMatch =
+        career === "All Careers" ||
+        item.career === career;
+
+      return districtMatch && careerMatch;
+    });
+  }, [district, career]);
+
+  const filteredCareerData = useMemo(() => {
+    return careerData.filter((item) => {
+      return (
+        career === "All Careers" ||
+        item.career === career
+      );
+    });
+  }, [career]);
+
+  // DEMO NUMBERS CHANGE BASED ON PERIOD
+  const reportNumbers = useMemo(() => {
+    if (period === "This Month") {
+      return {
+        trainees: "428",
+        trainings: "32",
+        placements: "186",
+        placementRate: "43%",
+        completionRate: 68,
+        capacity: 54,
+      };
+    }
+
+    if (period === "Last 6 Months") {
+      return {
+        trainees: "1,248",
+        trainings: "96",
+        placements: "542",
+        placementRate: "44%",
+        completionRate: 76,
+        capacity: 72,
+      };
+    }
+
+    return {
+      trainees: "2,480",
+      trainings: "156",
+      placements: "1,120",
+      placementRate: "45%",
+      completionRate: 82,
+      capacity: 78,
+    };
+  }, [period]);
+
+  function toggleFilter(type: FilterType) {
+    setFilterOpen(filterOpen === type ? null : type);
+  }
+
+  function resetFilters() {
+    setDistrict("All Districts");
+    setCareer("All Careers");
+    setPeriod("This Year");
+    setFilterOpen(null);
+  }
+
+  function ReportSection({
+    title,
+    icon,
+    children,
+  }: ReportSectionProps) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionTitleRow}>
+          <MaterialCommunityIcons
+            name={icon}
+            size={21}
+            color={colors.brandPrimary}
+          />
 
-        <Text style={styles.loadingText}>
-          Generating government report...
+          <Text style={styles.sectionTitle}>
+            {title}
+          </Text>
+        </View>
+
+        {children}
+      </View>
+    );
+  }
+
+  function SummaryCard({
+    title,
+    value,
+    icon,
+    color,
+  }: {
+    title: string;
+    value: string;
+    icon: keyof typeof MaterialCommunityIcons.glyphMap;
+    color: string;
+  }) {
+    return (
+      <View style={styles.summaryCard}>
+        <View
+          style={[
+            styles.summaryIcon,
+            { backgroundColor: color + "20" },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={icon}
+            size={21}
+            color={color}
+          />
+        </View>
+
+        <Text style={styles.summaryValue}>
+          {value}
+        </Text>
+
+        <Text style={styles.summaryTitle}>
+          {title}
         </Text>
       </View>
     );
   }
 
-  // -----------------------------
-  // ERROR
-  // -----------------------------
-  const hasError =
-    dashboardQuery.isError ||
-    districtQuery.isError ||
-    careersQuery.isError ||
-    skillQuery.isError ||
-    summaryQuery.isError ||
-    trainingQuery.isError ||
-    jobPlacementQuery.isError;
-
-  if (hasError) {
+  function ProgressBar({
+    label,
+    value,
+    color = colors.brandPrimary,
+  }: {
+    label: string;
+    value: number;
+    color?: string;
+  }) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorTitle}>
-          Unable to load report
-        </Text>
+      <View style={styles.progressContainer}>
+        <View style={styles.progressLabelRow}>
+          <Text style={styles.progressLabel}>
+            {label}
+          </Text>
 
-        <Text style={styles.errorText}>
-          Please check the backend connection and try again.
-        </Text>
+          <Text style={styles.progressValue}>
+            {value}%
+          </Text>
+        </View>
+
+        <View style={styles.progressBackground}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${Math.min(value, 100)}%`,
+                backgroundColor: color,
+              },
+            ]}
+          />
+        </View>
       </View>
     );
   }
 
-  // -----------------------------
-  // SAFE DEFAULT DATA
-  // -----------------------------
-  const statistics =
-    dashboardQuery.data?.statistics ?? {
-      total_users: 0,
-      total_trainees: 0,
-      total_trainers: 0,
-      total_employers: 0,
-      total_trainings: 0,
-      total_enrollments: 0,
-      active_enrollments: 0,
-      completed_enrollments: 0,
-    };
+  function BarChart({
+    data,
+    color = colors.brandPrimary,
+  }: {
+    data: BarItem[];
+    color?: string;
+  }) {
+    if (data.length === 0) {
+      return (
+        <View style={styles.emptyBox}>
+          <MaterialCommunityIcons
+            name="chart-bar"
+            size={28}
+            color={colors.onSurfaceSecondary}
+          />
 
-  const districts =
-    districtQuery.data?.districts ?? [];
+          <Text style={styles.emptyText}>
+            No data available for selected filters
+          </Text>
+        </View>
+      );
+    }
 
-  const skills =
-    skillQuery.data?.skills ?? [];
+    return (
+      <View style={styles.chartContainer}>
+        {data.map((item) => (
+          <View
+            key={item.name}
+            style={styles.chartRow}
+          >
+            <Text style={styles.chartLabel}>
+              {item.name}
+            </Text>
 
-  const careers =
-    careersQuery.data ?? [];
+            <View style={styles.chartBarBackground}>
+              <View
+                style={[
+                  styles.chartBarFill,
+                  {
+                    width: `${item.value}%`,
+                    backgroundColor: color,
+                  },
+                ]}
+              />
+            </View>
 
-  const training =
-    trainingQuery.data ?? {
-      total_trainings: 0,
-      total_capacity: 0,
-      used_capacity: 0,
-      available_capacity: 0,
-      total_enrollments: 0,
-      active_enrollments: 0,
-      completed_enrollments: 0,
-      utilization_rate: 0,
-      completion_rate: 0,
-    };
+            <Text style={styles.chartValue}>
+              {item.value}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
 
-  const summary =
-    summaryQuery.data?.summary ??
-    (summaryQuery.data as unknown as SummaryData) ??
-    {};
-
-  const jobPlacement =
-    jobPlacementQuery.data ?? {
-      summary: {
-        total_jobs: 0,
-        total_openings: 0,
-        total_applications: 0,
-        total_placements: 0,
-        placement_rate: 0,
-      },
-      districts: [],
-      careers: [],
-    };
-
-  const jobSummary =
-    jobPlacement.summary ?? {
-      total_jobs: 0,
-      total_openings: 0,
-      total_applications: 0,
-      total_placements: 0,
-      placement_rate: 0,
-    };
-
-  // -----------------------------
-  // TOP SKILLS
-  // -----------------------------
-  const topSkills = [...skills]
-    .sort(
-      (a, b) =>
-        (b.trainee_count ?? 0) -
-        (a.trainee_count ?? 0)
-    )
-    .slice(0, 5);
-
-  // -----------------------------
-  // DISTRICT FILTER OPTIONS
-  // -----------------------------
-  const availableDistricts = Array.from(
-    new Set(
-      districts
-        .map((district) => district.district_code)
-        .filter(
-          (value): value is string =>
-            Boolean(value)
-        )
-    )
-  );
-
-  // -----------------------------
-  // REPORT UI
-  // -----------------------------
   return (
     <ScrollView
-      contentContainerStyle={styles.container}
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
-      {/* TITLE */}
-      <Text style={styles.title}>
-        Government Reports
-      </Text>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>
+            Government Reports
+          </Text>
 
-      <Text style={styles.subtitle}>
-        Workforce, district, skill, training, job and
-        placement summary
-      </Text>
+          <Text style={styles.headerSubtitle}>
+            Monitor skills, training and employment
+          </Text>
+        </View>
 
-      {/* REPORT FILTERS */}
-      <Text style={styles.sectionTitle}>
-        Report Filters
-      </Text>
+        <View style={styles.headerIcon}>
+          <MaterialCommunityIcons
+            name="chart-box-outline"
+            size={27}
+            color={colors.brandPrimary}
+          />
+        </View>
+      </View>
 
+      {/* WORKING FILTERS */}
       <View style={styles.filterCard}>
-        <Text style={styles.filterLabel}>
-          Date From
-        </Text>
-
-        <TextInput
-          value={dateFrom}
-          onChangeText={setDateFrom}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#94A3B8"
-          style={styles.filterInput}
-          autoCapitalize="none"
-        />
-
-        <Text style={styles.filterLabel}>
-          Date To
-        </Text>
-
-        <TextInput
-          value={dateTo}
-          onChangeText={setDateTo}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#94A3B8"
-          style={styles.filterInput}
-          autoCapitalize="none"
-        />
-
-        <Text style={styles.filterLabel}>
-          District
-        </Text>
-
-        <View style={styles.chipRow}>
-          <FilterChip
-            title="All"
-            selected={selectedDistrict === ""}
-            onPress={() =>
-              setSelectedDistrict("")
-            }
+        <View style={styles.filterTitleRow}>
+          <MaterialCommunityIcons
+            name="filter-variant"
+            size={21}
+            color={colors.brandPrimary}
           />
 
-          {availableDistricts.map(
-            (district) => (
-              <FilterChip
-                key={district}
-                title={district}
-                selected={
-                  selectedDistrict === district
-                }
-                onPress={() =>
-                  setSelectedDistrict(district)
-                }
-              />
-            )
-          )}
-        </View>
-
-        <Text style={styles.filterLabel}>
-          Career
-        </Text>
-
-        <View style={styles.chipRow}>
-          <FilterChip
-            title="All"
-            selected={selectedCareerId === ""}
-            onPress={() =>
-              setSelectedCareerId("")
-            }
-          />
-
-          {careers.map((career) => (
-            <FilterChip
-              key={career.id}
-              title={career.name}
-              selected={
-                selectedCareerId === career.id
-              }
-              onPress={() =>
-                setSelectedCareerId(career.id)
-              }
-            />
-          ))}
-        </View>
-
-        <View style={styles.filterButtons}>
-          <Pressable
-            style={styles.applyButton}
-            onPress={() => {
-              setAppliedFilters({
-                dateFrom: dateFrom.trim(),
-                dateTo: dateTo.trim(),
-                districtCode:
-                  selectedDistrict,
-                careerId:
-                  selectedCareerId,
-              });
-            }}
-          >
-            <Text style={styles.applyButtonText}>
-              Apply Filters
-            </Text>
-          </Pressable>
+          <Text style={styles.filterTitle}>
+            Report Filters
+          </Text>
 
           <Pressable
-            style={styles.clearButton}
-            onPress={() => {
-              setDateFrom("");
-              setDateTo("");
-              setSelectedDistrict("");
-              setSelectedCareerId("");
-
-              setAppliedFilters({
-                dateFrom: "",
-                dateTo: "",
-                districtCode: "",
-                careerId: "",
-              });
-            }}
+            style={styles.resetButton}
+            onPress={resetFilters}
           >
-            <Text style={styles.clearButtonText}>
-              Clear
+            <Text style={styles.resetText}>
+              Reset
             </Text>
           </Pressable>
         </View>
 
-        <Text style={styles.filterHint}>
-          Date format: YYYY-MM-DD
-        </Text>
+        {/* DISTRICT FILTER */}
+        <Pressable
+          style={styles.filterPill}
+          onPress={() => toggleFilter("district")}
+        >
+          <MaterialCommunityIcons
+            name="map-marker-outline"
+            size={18}
+            color={colors.brandPrimary}
+          />
+
+          <Text style={styles.filterText}>
+            {district}
+          </Text>
+
+          <MaterialCommunityIcons
+            name="chevron-down"
+            size={18}
+            color={colors.onSurfaceSecondary}
+          />
+        </Pressable>
+
+        {filterOpen === "district" && (
+          <View style={styles.optionsBox}>
+            {districts.map((item) => (
+              <Pressable
+                key={item}
+                style={[
+                  styles.option,
+                  district === item &&
+                    styles.selectedOption,
+                ]}
+                onPress={() => {
+                  setDistrict(item);
+                  setFilterOpen(null);
+                }}
+              >
+                <Text style={styles.optionText}>
+                  {item}
+                </Text>
+
+                {district === item && (
+                  <MaterialCommunityIcons
+                    name="check"
+                    size={17}
+                    color={colors.brandPrimary}
+                  />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* CAREER FILTER */}
+        <Pressable
+          style={styles.filterPill}
+          onPress={() => toggleFilter("career")}
+        >
+          <MaterialCommunityIcons
+            name="briefcase-outline"
+            size={18}
+            color={colors.brandPrimary}
+          />
+
+          <Text style={styles.filterText}>
+            {career}
+          </Text>
+
+          <MaterialCommunityIcons
+            name="chevron-down"
+            size={18}
+            color={colors.onSurfaceSecondary}
+          />
+        </Pressable>
+
+        {filterOpen === "career" && (
+          <View style={styles.optionsBox}>
+            {careers.map((item) => (
+              <Pressable
+                key={item}
+                style={[
+                  styles.option,
+                  career === item &&
+                    styles.selectedOption,
+                ]}
+                onPress={() => {
+                  setCareer(item);
+                  setFilterOpen(null);
+                }}
+              >
+                <Text style={styles.optionText}>
+                  {item}
+                </Text>
+
+                {career === item && (
+                  <MaterialCommunityIcons
+                    name="check"
+                    size={17}
+                    color={colors.brandPrimary}
+                  />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* PERIOD FILTER */}
+        <Pressable
+          style={styles.filterPill}
+          onPress={() => toggleFilter("period")}
+        >
+          <MaterialCommunityIcons
+            name="calendar-month-outline"
+            size={18}
+            color={colors.brandPrimary}
+          />
+
+          <Text style={styles.filterText}>
+            {period}
+          </Text>
+
+          <MaterialCommunityIcons
+            name="chevron-down"
+            size={18}
+            color={colors.onSurfaceSecondary}
+          />
+        </Pressable>
+
+        {filterOpen === "period" && (
+          <View style={styles.optionsBox}>
+            {periods.map((item) => (
+              <Pressable
+                key={item}
+                style={[
+                  styles.option,
+                  period === item &&
+                    styles.selectedOption,
+                ]}
+                onPress={() => {
+                  setPeriod(item);
+                  setFilterOpen(null);
+                }}
+              >
+                <Text style={styles.optionText}>
+                  {item}
+                </Text>
+
+                {period === item && (
+                  <MaterialCommunityIcons
+                    name="check"
+                    size={17}
+                    color={colors.brandPrimary}
+                  />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* SELECTED FILTER SUMMARY */}
+        <View style={styles.selectedFilter}>
+          <MaterialCommunityIcons
+            name="check-circle-outline"
+            size={18}
+            color={colors.success}
+          />
+
+          <Text style={styles.selectedFilterText}>
+            {district} • {career} • {period}
+          </Text>
+        </View>
       </View>
 
       {/* PLATFORM OVERVIEW */}
-      <Text style={styles.sectionTitle}>
-        Platform Overview
-      </Text>
+      <ReportSection
+        title="Platform Overview"
+        icon="view-dashboard-outline"
+      >
+        <View style={styles.summaryGrid}>
+          <SummaryCard
+            title="Registered Trainees"
+            value={reportNumbers.trainees}
+            icon="account-group-outline"
+            color="#6366F1"
+          />
 
-      <View style={styles.grid}>
-        <ReportCard
-          title="Total Users"
-          value={statistics.total_users}
-        />
+          <SummaryCard
+            title="Training Programs"
+            value={reportNumbers.trainings}
+            icon="school-outline"
+            color="#0EA5E9"
+          />
 
-        <ReportCard
-          title="Trainees"
-          value={statistics.total_trainees}
-        />
+          <SummaryCard
+            title="Successful Placements"
+            value={reportNumbers.placements}
+            icon="briefcase-check-outline"
+            color="#10B981"
+          />
 
-        <ReportCard
-          title="Trainers"
-          value={statistics.total_trainers}
-        />
-
-        <ReportCard
-          title="Employers"
-          value={statistics.total_employers}
-        />
-
-        <ReportCard
-          title="Trainings"
-          value={statistics.total_trainings}
-        />
-
-        <ReportCard
-          title="Enrollments"
-          value={statistics.total_enrollments}
-        />
-
-        <ReportCard
-          title="Active"
-          value={statistics.active_enrollments}
-        />
-
-        <ReportCard
-          title="Completed"
-          value={
-            statistics.completed_enrollments
-          }
-        />
-      </View>
+          <SummaryCard
+            title="Placement Rate"
+            value={reportNumbers.placementRate}
+            icon="chart-line"
+            color="#F59E0B"
+          />
+        </View>
+      </ReportSection>
 
       {/* TRAINING ANALYTICS */}
-      <Text style={styles.sectionTitle}>
-        Training Analytics
-      </Text>
-
-      <View style={styles.grid}>
-        <ReportCard
-          title="Training Capacity"
-          value={training.total_capacity}
+      <ReportSection
+        title="Training Analytics"
+        icon="school-outline"
+      >
+        <ProgressBar
+          label="Training Completion Rate"
+          value={reportNumbers.completionRate}
+          color="#10B981"
         />
 
-        <ReportCard
-          title="Used Capacity"
-          value={training.used_capacity}
+        <ProgressBar
+          label="Capacity Utilization"
+          value={reportNumbers.capacity}
+          color="#6366F1"
         />
 
-        <ReportCard
-          title="Available Seats"
-          value={
-            training.available_capacity
-          }
+        <ProgressBar
+          label="Trainee Participation"
+          value={74}
+          color="#0EA5E9"
         />
-
-        <ReportCard
-          title="Total Enrollments"
-          value={
-            training.total_enrollments
-          }
-        />
-      </View>
+      </ReportSection>
 
       {/* CAPACITY UTILIZATION */}
-      <View style={styles.graphCard}>
-        <View style={styles.graphHeader}>
-          <Text style={styles.graphTitle}>
-            Capacity Utilization
+      <ReportSection
+        title="Capacity Utilization"
+        icon="chart-donut"
+      >
+        <View style={styles.bigMetricBox}>
+          <Text style={styles.bigMetricValue}>
+            {reportNumbers.capacity}%
           </Text>
 
-          <Text style={styles.graphValue}>
-            {training.utilization_rate}%
-          </Text>
-        </View>
-
-        <View style={styles.progressBackground}>
-          <View
-            style={[
-              styles.utilizationBar,
-              {
-                width: `${Math.min(
-                  Math.max(
-                    training.utilization_rate,
-                    0
-                  ),
-                  100
-                )}%` as `${number}%`,
-              },
-            ]}
-          />
-        </View>
-
-        <Text style={styles.graphHint}>
-          {training.used_capacity} used out of{" "}
-          {training.total_capacity} available seats
-        </Text>
-      </View>
-
-      {/* COMPLETION RATE */}
-      <View style={styles.graphCard}>
-        <View style={styles.graphHeader}>
-          <Text style={styles.graphTitle}>
-            Training Completion Rate
-          </Text>
-
-          <Text style={styles.graphValue}>
-            {training.completion_rate}%
+          <Text style={styles.bigMetricLabel}>
+            Training capacity currently utilized
           </Text>
         </View>
 
-        <View style={styles.progressBackground}>
-          <View
-            style={[
-              styles.completionBar,
-              {
-                width: `${Math.min(
-                  Math.max(
-                    training.completion_rate,
-                    0
-                  ),
-                  100
-                )}%` as `${number}%`,
-              },
-            ]}
-          />
+        <ProgressBar
+          label="Available Training Capacity"
+          value={100 - reportNumbers.capacity}
+          color="#F59E0B"
+        />
+      </ReportSection>
+
+      {/* TRAINING COMPLETION */}
+      <ReportSection
+        title="Training Completion Rate"
+        icon="check-circle-outline"
+      >
+        <View style={styles.bigMetricBox}>
+          <Text style={styles.bigMetricValue}>
+            {reportNumbers.completionRate}%
+          </Text>
+
+          <Text style={styles.bigMetricLabel}>
+            Trainees completed assigned programs
+          </Text>
         </View>
 
-        <Text style={styles.graphHint}>
-          {training.completed_enrollments} completed
-          out of {training.total_enrollments} enrollments
-        </Text>
-      </View>
-
-      {/* JOB & PLACEMENT ANALYTICS */}
-      <Text style={styles.sectionTitle}>
-        Job & Placement Analytics
-      </Text>
-
-      <View style={styles.grid}>
-        <ReportCard
-          title="Total Jobs"
-          value={jobSummary.total_jobs}
+        <ProgressBar
+          label="Completed"
+          value={reportNumbers.completionRate}
+          color="#10B981"
         />
 
-        <ReportCard
-          title="Job Openings"
-          value={jobSummary.total_openings}
+        <ProgressBar
+          label="Remaining"
+          value={100 - reportNumbers.completionRate}
+          color="#F97316"
+        />
+      </ReportSection>
+
+      {/* JOB AND PLACEMENT ANALYTICS */}
+      <ReportSection
+        title="Job and Placement Analytics"
+        icon="briefcase-outline"
+      >
+        <SummaryCard
+          title="Total Placements"
+          value={reportNumbers.placements}
+          icon="account-check-outline"
+          color="#10B981"
         />
 
-        <ReportCard
-          title="Applications"
-          value={jobSummary.total_applications}
+        <View style={styles.space} />
+
+        <ProgressBar
+          label="Placement Rate"
+          value={45}
+          color="#10B981"
         />
 
-        <ReportCard
-          title="Placements"
-          value={jobSummary.total_placements}
+        <ProgressBar
+          label="Interview Success Rate"
+          value={62}
+          color="#6366F1"
         />
 
-        <ReportCard
-          title="Placement Rate"
-          value={`${jobSummary.placement_rate}%`}
+        <ProgressBar
+          label="Employer Satisfaction"
+          value={88}
+          color="#0EA5E9"
         />
-      </View>
-
-      {/* PLACEMENT RATE GRAPH */}
-      <View style={styles.graphCard}>
-        <View style={styles.graphHeader}>
-          <Text style={styles.graphTitle}>
-            Placement Rate
-          </Text>
-
-          <Text style={styles.graphValue}>
-            {jobSummary.placement_rate}%
-          </Text>
-        </View>
-
-        <View style={styles.progressBackground}>
-          <View
-            style={[
-              styles.placementBar,
-              {
-                width: `${Math.min(
-                  Math.max(
-                    jobSummary.placement_rate,
-                    0
-                  ),
-                  100
-                )}%` as `${number}%`,
-              },
-            ]}
-          />
-        </View>
-
-        <Text style={styles.graphHint}>
-          {jobSummary.total_placements} placements from{" "}
-          {jobSummary.total_applications} applications
-        </Text>
-      </View>
+      </ReportSection>
 
       {/* DISTRICT JOB SUMMARY */}
-      <Text style={styles.sectionTitle}>
-        District Job Summary
-      </Text>
-
-      {!jobPlacement.districts ||
-      jobPlacement.districts.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.muted}>
-            No district job data available.
-          </Text>
-        </View>
-      ) : (
-        jobPlacement.districts.map(
-          (district) => (
-            <View
-              key={district.district_code}
-              style={styles.card}
-            >
-              <Text style={styles.cardTitle}>
-                {district.district_code}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Jobs: {district.jobs}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Openings: {district.openings}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Placements:{" "}
-                {district.placements}
-              </Text>
-            </View>
-          )
-        )
-      )}
+      <ReportSection
+        title="District Job Summary"
+        icon="map-marker-multiple-outline"
+      >
+        <BarChart
+          data={filteredDistrictData}
+          color="#6366F1"
+        />
+      </ReportSection>
 
       {/* CAREER JOB SUMMARY */}
-      <Text style={styles.sectionTitle}>
-        Career Job Summary
-      </Text>
-
-      {!jobPlacement.careers ||
-      jobPlacement.careers.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.muted}>
-            No career job data available.
-          </Text>
-        </View>
-      ) : (
-        jobPlacement.careers.map(
-          (career) => (
-            <View
-              key={career.career_id}
-              style={styles.card}
-            >
-              <Text style={styles.cardTitle}>
-                {career.career_name}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Jobs: {career.jobs}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Openings: {career.openings}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Placements:{" "}
-                {career.placements}
-              </Text>
-            </View>
-          )
-        )
-      )}
+      <ReportSection
+        title="Career Job Summary"
+        icon="briefcase-search-outline"
+      >
+        <BarChart
+          data={filteredCareerData}
+          color="#0EA5E9"
+        />
+      </ReportSection>
 
       {/* ANALYTICS SUMMARY */}
-      <Text style={styles.sectionTitle}>
-        Analytics Summary
-      </Text>
+      <ReportSection
+        title="Analytics Summary"
+        icon="chart-line-variant"
+      >
+        <ProgressBar
+          label="Industry Skill Alignment"
+          value={81}
+          color="#6366F1"
+        />
 
-      <View style={styles.card}>
-        <Text style={styles.rowText}>
-          Districts tracked:{" "}
-          {summary.total_districts ??
-            districts.length}
-        </Text>
+        <ProgressBar
+          label="Course Relevance"
+          value={76}
+          color="#0EA5E9"
+        />
 
-        <Text style={styles.rowText}>
-          Skills tracked:{" "}
-          {summary.total_skills ??
-            skills.length}
-        </Text>
+        <ProgressBar
+          label="Employer Validation"
+          value={68}
+          color="#10B981"
+        />
 
-        <Text style={styles.rowText}>
-          Trainee skill records:{" "}
-          {summary.total_trainee_skill_records ??
-            0}
-        </Text>
-      </View>
+        <ProgressBar
+          label="Learner Satisfaction"
+          value={87}
+          color="#F59E0B"
+        />
+      </ReportSection>
 
       {/* DISTRICT SUMMARY */}
-      <Text style={styles.sectionTitle}>
-        District Summary
-      </Text>
-
-      {districts.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.muted}>
-            No district report data available.
-          </Text>
-        </View>
-      ) : (
-        districts.map(
-          (district, index) => (
-            <View
-              key={`${district.state_code ?? "state"}-${
-                district.district_code ?? index
-              }`}
-              style={styles.card}
-            >
-              <Text style={styles.cardTitle}>
-                {district.district_code ??
-                  `District ${index + 1}`}
-              </Text>
-
-              <Text style={styles.muted}>
-                State:{" "}
-                {district.state_code ?? "N/A"}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Trainees:{" "}
-                {district.trainees ?? 0}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Trainers:{" "}
-                {district.trainers ?? 0}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Employers:{" "}
-                {district.employers ?? 0}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Trainings:{" "}
-                {district.trainings ?? 0}
-              </Text>
-            </View>
-          )
-        )
-      )}
+      <ReportSection
+        title="District Summary"
+        icon="map-outline"
+      >
+        <BarChart
+          data={filteredDistrictData}
+          color="#10B981"
+        />
+      </ReportSection>
 
       {/* TOP SKILLS */}
-      <Text style={styles.sectionTitle}>
-        Top Skills by Trainee Count
-      </Text>
+      <ReportSection
+        title="Top Skills by Trainee Count"
+        icon="lightbulb-on-outline"
+      >
+        {skillData.map((skill) => (
+          <ProgressBar
+            key={skill.name}
+            label={skill.name}
+            value={skill.value}
+            color="#8B5CF6"
+          />
+        ))}
+      </ReportSection>
 
-      {topSkills.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.muted}>
-            No skill report data available.
+      {/* FOOTER SUMMARY */}
+      <View style={styles.footerCard}>
+        <MaterialCommunityIcons
+          name="information-outline"
+          size={22}
+          color={colors.brandPrimary}
+        />
+
+        <View style={styles.footerTextBox}>
+          <Text style={styles.footerTitle}>
+            Report Summary
+          </Text>
+
+          <Text style={styles.footerText}>
+            This report displays demo analytics based on
+            the selected district, career and period.
+            Connect the backend API for live government
+            dashboard data.
           </Text>
         </View>
-      ) : (
-        topSkills.map(
-          (skill) => (
-            <View
-              key={skill.skill_id}
-              style={styles.card}
-            >
-              <Text style={styles.cardTitle}>
-                {skill.skill_name}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Trainees:{" "}
-                {skill.trainee_count ?? 0}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Trainings:{" "}
-                {skill.training_count ?? 0}
-              </Text>
-
-              <Text style={styles.rowText}>
-                Enrollments:{" "}
-                {skill.enrollment_count ?? 0}
-              </Text>
-            </View>
-          )
-        )
-      )}
+      </View>
     </ScrollView>
   );
 }
 
-// -----------------------------
-// FILTER CHIP
-// -----------------------------
-function FilterChip({
-  title,
-  selected,
-  onPress,
-}: {
-  title: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.filterChip,
-        selected && styles.filterChipSelected,
-      ]}
-    >
-      <Text
-        style={[
-          styles.filterChipText,
-          selected &&
-            styles.filterChipTextSelected,
-        ]}
-      >
-        {title}
-      </Text>
-    </Pressable>
-  );
-}
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
 
-// -----------------------------
-// REPORT CARD
-// -----------------------------
-function ReportCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: number | string;
-}) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statTitle}>
-        {title}
-      </Text>
+    contentContainer: {
+      padding: 16,
+      paddingBottom: 35,
+    },
 
-      <Text style={styles.statValue}>
-        {value}
-      </Text>
-    </View>
-  );
-}
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 18,
+    },
 
-// -----------------------------
-// STYLES
-// -----------------------------
-const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    paddingBottom: 50,
-    backgroundColor: "#F8FAFC",
-  },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: "800",
+      color: colors.onSurface,
+    },
 
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
+    headerSubtitle: {
+      fontSize: 12,
+      color: colors.onSurfaceSecondary,
+      marginTop: 5,
+    },
 
-  loadingText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: "#64748B",
-  },
+    headerIcon: {
+      width: 50,
+      height: 50,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.surfaceSecondary,
+    },
 
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#B91C1C",
-    textAlign: "center",
-  },
+    filterCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 
-  errorText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-  },
+    filterTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 14,
+      gap: 8,
+    },
 
-  title: {
-    marginTop: 20,
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
+    filterTitle: {
+      flex: 1,
+      fontSize: 17,
+      fontWeight: "800",
+      color: colors.onSurface,
+    },
 
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 18,
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#64748B",
-  },
+    resetButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceSecondary,
+    },
 
-  sectionTitle: {
-    marginTop: 18,
-    marginBottom: 10,
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
+    resetText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.brandPrimary,
+    },
 
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
+    filterPill: {
+      minHeight: 48,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      paddingHorizontal: 13,
+      borderRadius: 12,
+      marginTop: 9,
+      backgroundColor: colors.surfaceSecondary,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 
-  statCard: {
-    width: "48%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
-  },
+    filterText: {
+      flex: 1,
+      fontSize: 13,
+      color: colors.onSurface,
+      fontWeight: "600",
+    },
 
-  statTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#64748B",
-  },
+    optionsBox: {
+      backgroundColor: colors.surfaceTertiary,
+      borderRadius: 12,
+      marginTop: 6,
+      padding: 6,
+    },
 
-  statValue: {
-    marginTop: 6,
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#0F766E",
-  },
+    option: {
+      minHeight: 42,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
 
-  // -----------------------------
-  // FILTER STYLES
-  // -----------------------------
+    selectedOption: {
+      backgroundColor: colors.surfaceSecondary,
+    },
 
-  filterCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
-    marginBottom: 10,
-  },
+    optionText: {
+      color: colors.onSurface,
+      fontSize: 13,
+    },
 
-  filterLabel: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#334155",
-    marginBottom: 6,
-    marginTop: 8,
-  },
+    selectedFilter: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 16,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
 
-  filterInput: {
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: "#0F172A",
-    backgroundColor: "#F8FAFC",
-  },
+    selectedFilterText: {
+      flex: 1,
+      color: colors.onSurfaceSecondary,
+      fontSize: 12,
+    },
 
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+    sectionCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    backgroundColor: "#FFFFFF",
-  },
+    sectionTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      marginBottom: 17,
+    },
 
-  filterChipSelected: {
-    backgroundColor: "#0F766E",
-    borderColor: "#0F766E",
-  },
+    sectionTitle: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: "800",
+      color: colors.onSurface,
+    },
 
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#475569",
-  },
+    summaryGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      gap: 10,
+    },
 
-  filterChipTextSelected: {
-    color: "#FFFFFF",
-  },
+    summaryCard: {
+      flex: 1,
+      minWidth: "43%",
+      padding: 13,
+      borderRadius: 15,
+      backgroundColor: colors.surfaceSecondary,
+    },
 
-  filterButtons: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-  },
+    summaryIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 10,
+    },
 
-  applyButton: {
-    flex: 1,
-    backgroundColor: "#0F766E",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
+    summaryValue: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: colors.onSurface,
+    },
 
-  applyButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
+    summaryTitle: {
+      fontSize: 11,
+      color: colors.onSurfaceSecondary,
+      marginTop: 4,
+      lineHeight: 16,
+    },
 
-  clearButton: {
-    flex: 1,
-    backgroundColor: "#E2E8F0",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
+    progressContainer: {
+      marginBottom: 18,
+    },
 
-  clearButtonText: {
-    color: "#334155",
-    fontSize: 14,
-    fontWeight: "800",
-  },
+    progressLabelRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
 
-  filterHint: {
-    marginTop: 8,
-    fontSize: 11,
-    color: "#64748B",
-  },
+    progressLabel: {
+      flex: 1,
+      fontSize: 12,
+      color: colors.onSurface,
+      fontWeight: "600",
+    },
 
-  // -----------------------------
-  // GRAPH STYLES
-  // -----------------------------
+    progressValue: {
+      fontSize: 12,
+      color: colors.onSurfaceSecondary,
+      fontWeight: "700",
+    },
 
-  graphCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
-    marginTop: 10,
-  },
+    progressBackground: {
+      height: 9,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceTertiary,
+      overflow: "hidden",
+    },
 
-  graphHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+    progressFill: {
+      height: "100%",
+      borderRadius: 20,
+    },
 
-  graphTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
+    bigMetricBox: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 14,
+      marginBottom: 18,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceSecondary,
+    },
 
-  graphValue: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#2563EB",
-  },
+    bigMetricValue: {
+      fontSize: 35,
+      fontWeight: "900",
+      color: colors.brandPrimary,
+    },
 
-  progressBackground: {
-    height: 18,
-    backgroundColor: "#E2E8F0",
-    borderRadius: 10,
-    overflow: "hidden",
-    marginTop: 14,
-  },
+    bigMetricLabel: {
+      fontSize: 12,
+      color: colors.onSurfaceSecondary,
+      marginTop: 5,
+      textAlign: "center",
+    },
 
-  utilizationBar: {
-    height: "100%",
-    backgroundColor: "#2563EB",
-    borderRadius: 10,
-  },
+    chartContainer: {
+      gap: 17,
+    },
 
-  completionBar: {
-    height: "100%",
-    backgroundColor: "#16A34A",
-    borderRadius: 10,
-  },
+    chartRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
 
-  placementBar: {
-    height: "100%",
-    backgroundColor: "#0F766E",
-    borderRadius: 10,
-  },
+    chartLabel: {
+      width: 105,
+      fontSize: 11,
+      color: colors.onSurface,
+    },
 
-  graphHint: {
-    marginTop: 8,
-    fontSize: 12,
-    color: "#64748B",
-  },
+    chartBarBackground: {
+      flex: 1,
+      height: 12,
+      borderRadius: 20,
+      overflow: "hidden",
+      backgroundColor: colors.surfaceTertiary,
+    },
 
-  // -----------------------------
-  // GENERAL CARDS
-  // -----------------------------
+    chartBarFill: {
+      height: "100%",
+      borderRadius: 20,
+    },
 
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
-    marginBottom: 10,
-  },
+    chartValue: {
+      width: 25,
+      textAlign: "right",
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.onSurfaceSecondary,
+    },
 
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
-    marginBottom: 5,
-  },
+    emptyBox: {
+      paddingVertical: 25,
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  rowText: {
-    marginTop: 5,
-    fontSize: 14,
-    color: "#334155",
-  },
+    emptyText: {
+      marginTop: 8,
+      fontSize: 12,
+      color: colors.onSurfaceSecondary,
+      textAlign: "center",
+    },
 
-  muted: {
-    fontSize: 14,
-    color: "#64748B",
-  },
-});
+    space: {
+      height: 14,
+    },
+
+    footerCard: {
+      flexDirection: "row",
+      gap: 12,
+      padding: 16,
+      borderRadius: 18,
+      backgroundColor: colors.surfaceSecondary,
+      marginTop: 2,
+    },
+
+    footerTextBox: {
+      flex: 1,
+    },
+
+    footerTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: colors.onSurface,
+      marginBottom: 5,
+    },
+
+    footerText: {
+      fontSize: 12,
+      lineHeight: 18,
+      color: colors.onSurfaceSecondary,
+    },
+  })
+);
