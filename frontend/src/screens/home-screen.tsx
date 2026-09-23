@@ -45,7 +45,8 @@ export function HomeScreen() {
         {user.role === "TRAINEE" ? <TraineeDashboard /> : null}
         {user.role === "TRAINER" ? <TrainerDashboard /> : null}
         {user.role === "ADMIN" ? <AdminDashboard /> : null}
-        {user.role === "EMPLOYER" || user.role === "GOVERNMENT" ? <NonTraineePlaceholder /> : null}
+        {user.role === "EMPLOYER" ? <EmployerDashboard /> : null}
+        {user.role === "GOVERNMENT" ? <NonTraineePlaceholder /> : null}
       </ScrollView>
     </View>
   );
@@ -168,6 +169,34 @@ function TrainerDashboard() {
         <ActionCard testID="action-learners" icon="account-group-outline" title="Learners" text="Complete and verify skills" onPress={() => router.push("/learners")} />
         <ActionCard testID="action-trainer-profile" icon="badge-account-horizontal-outline" title="My profile" text="Headline, skills, institution" onPress={() => router.push("/trainer-profile")} />
         <ActionCard testID="action-my-trainings" icon="book-open-variant" title="My trainings" text="Edit or close your courses" onPress={() => router.push("/trainings")} />
+      </View>
+    </View>
+  );
+}
+
+function EmployerDashboard() {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const authed = useAuthedRequest();
+  const jobsQuery = useQuery({
+    queryKey: ["employer", "jobs"],
+    queryFn: () => authed<{ status: string }[]>("/employer/jobs"),
+  });
+  const openJobs = (jobsQuery.data ?? []).filter((j) => j.status === "OPEN").length;
+  return (
+    <View>
+      <View style={styles.heroCard}>
+        <View style={styles.heroIcon}><MaterialCommunityIcons name="office-building-outline" size={24} color={colors.onBrandPrimary} /></View>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroTitle}>{openJobs} open job{openJobs === 1 ? "" : "s"}</Text>
+          <Text style={styles.heroText}>Post roles, review applicants, and see candidates matched to your required skills.</Text>
+        </View>
+      </View>
+      <Text style={styles.sectionTitle}>Quick actions</Text>
+      <View style={styles.grid}>
+        <ActionCard testID="action-new-job" icon="plus-circle-outline" title="Post a job" text="Publish a new opening" onPress={() => router.push("/jobs")} />
+        <ActionCard testID="action-my-jobs" icon="briefcase-outline" title="My jobs" text="Edit, close, view applicants" onPress={() => router.push("/jobs")} />
+        <ActionCard testID="action-employer-profile" icon="domain" title="Company profile" text="Name, industry, location" onPress={() => router.push("/employer-profile")} />
       </View>
     </View>
   );

@@ -22,6 +22,7 @@ export default function TabsLayout() {
   if (user.role === "TRAINEE" && !user.profile_complete) return <Redirect href="/onboarding" />;
   const isTrainee = user.role === "TRAINEE";
   const isTrainer = user.role === "TRAINER";
+  const isEmployer = user.role === "EMPLOYER";
   const isAdmin = user.role === "ADMIN";
   if (usesNativeTabs) {
     return (
@@ -60,6 +61,12 @@ export default function TabsLayout() {
             <NativeTabs.Trigger.Label>Approvals</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
         ) : null}
+        {isEmployer ? (
+          <NativeTabs.Trigger name="jobs">
+            <NativeTabs.Trigger.Icon sf="briefcase" />
+            <NativeTabs.Trigger.Label>Jobs</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+        ) : null}
         <NativeTabs.Trigger name="profile">
           <NativeTabs.Trigger.Icon sf="person.crop.circle" />
           <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
@@ -83,6 +90,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="trainings" options={{ title: "Trainings", href: isTrainer ? "/trainings" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="book-open-variant" color={color} size={size} /> }} />
       <Tabs.Screen name="learners" options={{ title: "Learners", href: isTrainer ? "/learners" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="approvals" options={{ title: "Approvals", href: isAdmin ? "/approvals" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="check-decagram-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="jobs" options={{ title: "Jobs", href: isEmployer ? "/jobs" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="briefcase-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-circle-outline" color={color} size={size} /> }} />
     </Tabs>
   );
