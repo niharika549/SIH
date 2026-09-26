@@ -162,3 +162,73 @@ export const PROFICIENCY_LABEL: Record<Proficiency, string> = {
   INTERMEDIATE: "Intermediate",
   ADVANCED: "Advanced",
 };
+
+export type JobStatus = "OPEN" | "CLOSED";
+export type ApplicationStatus = "APPLIED" | "SHORTLISTED" | "INTERVIEW" | "SELECTED" | "REJECTED";
+
+export type EmployerProfile = {
+  user_id: string;
+  company_name: string;
+  industry: string;
+  company_size: string;
+  website: string;
+  logo_url: string;
+  about: string;
+  state_code: string | null;
+  district_code: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JobSkill = { skill_id: string; required_level: Proficiency };
+
+export type Job = {
+  id: string;
+  title: string;
+  description: string;
+  skills: JobSkill[];
+  location: string;
+  salary_min: number | null;
+  salary_max: number | null;
+  experience_years: number;
+  qualification: string;
+  openings: number;
+  expiry_date: string | null;
+  company_name: string;
+  employer_user_id: string;
+  status: JobStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Application = {
+  id: string;
+  job_id: string;
+  employer_user_id: string;
+  trainee_user_id: string;
+  status: ApplicationStatus;
+  feedback: string;
+  applied_at: string;
+  updated_at: string;
+  job?: Job | null;
+  trainee?: { id: string; full_name: string; email: string; state_code?: string | null; district_code?: string | null };
+  trainee_skills?: TraineeSkill[];
+};
+
+export type CandidateMatch = {
+  trainee: { id: string; full_name: string; email: string; state_code?: string | null; district_code?: string | null };
+  match_percentage: number;
+  method: "weighted_v1" | "skill_only_fallback";
+  skill_breakdown: { skill_id: string; required_level: Proficiency; candidate_level: Proficiency; met: boolean }[];
+  experience_note?: string;
+  qualification_note?: string;
+  explanation: string;
+};
+
+export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
+  APPLIED: "Applied",
+  SHORTLISTED: "Shortlisted",
+  INTERVIEW: "Interview",
+  SELECTED: "Selected",
+  REJECTED: "Rejected",
+};

@@ -10,7 +10,7 @@ export function ProficiencyBadge({ level, source }: { level: Proficiency; source
   const { colors } = useTheme();
   const palette: Record<Proficiency, { bg: string; fg: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }> = {
     NONE: { bg: colors.surfaceTertiary, fg: colors.muted, icon: "circle-outline" },
-    BEGINNER: { bg: colors.brandTertiary, fg: colors.onBrandTertiary, icon: "seedling-outline" },
+    BEGINNER: { bg: colors.brandTertiary, fg: colors.onBrandTertiary, icon: "seed-outline" },
     INTERMEDIATE: { bg: colors.brandTertiary, fg: colors.onBrandTertiary, icon: "chart-line-variant" },
     ADVANCED: { bg: colors.success, fg: colors.onSuccess, icon: "trophy-outline" },
   };
