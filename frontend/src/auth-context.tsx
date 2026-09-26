@@ -56,12 +56,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (credentials: Credentials) => {
-    const result = await apiRequest<AuthResponse>("/auth/login", { method: "POST", body: credentials });
-    if (!result.access_token) throw new Error("The server did not return a session token");
-    await storage.secureSet(AUTH_TOKEN_KEY, result.access_token);
+  try {
+    const result = await apiRequest<AuthResponse>(
+      "/auth/login",
+      {
+        method: "POST",
+        body: credentials,
+      },
+    );
+
+    if (!result.access_token) {
+      throw new Error("The server did not return a session token");
+    }
+
+    await storage.secureSet(
+      AUTH_TOKEN_KEY,
+      result.access_token,
+    );
+
     setToken(result.access_token);
     setUser(result.user);
-  }, []);
+  } catch (error) {
+    console.log("LOGIN ERROR:", error);
+    throw error;
+  }
+}, []);
 
   const register = useCallback(async (input: Credentials & { full_name: string; role: Role }) => {
     const result = await apiRequest<AuthResponse>("/auth/register", { method: "POST", body: input });

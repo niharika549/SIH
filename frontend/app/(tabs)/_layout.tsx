@@ -90,7 +90,22 @@ export default function TabsLayout() {
       <Tabs.Screen name="trainings" options={{ title: "Trainings", href: isTrainer ? "/trainings" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="book-open-variant" color={color} size={size} /> }} />
       <Tabs.Screen name="learners" options={{ title: "Learners", href: isTrainer ? "/learners" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group-outline" color={color} size={size} /> }} />
       <Tabs.Screen name="approvals" options={{ title: "Approvals", href: isAdmin ? "/approvals" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="check-decagram-outline" color={color} size={size} /> }} />
-      <Tabs.Screen name="jobs" options={{ title: "Jobs", href: isEmployer ? "/jobs" : null, tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="briefcase-outline" color={color} size={size} /> }} />
+      <Tabs.Screen
+  name="jobs"
+  options={{
+    title: "Jobs",
+    href: isEmployer
+      ? ("/employer-jobs" as any)
+      : null,
+    tabBarIcon: ({ color, size }) => (
+      <MaterialCommunityIcons
+        name="briefcase-outline"
+        color={color}
+        size={size}
+      />
+    ),
+  }}
+/>
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-circle-outline" color={color} size={size} /> }} />
     </Tabs>
   );

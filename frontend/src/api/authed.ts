@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 
-import { ApiError, apiRequest } from "@/src/api/client";
-import { useAuth } from "@/src/auth-context";
+import { ApiError, apiRequest } from "./client";
+import { useAuth } from "../auth-context";
 
 type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown };
 

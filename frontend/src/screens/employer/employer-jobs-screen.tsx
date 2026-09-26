@@ -179,7 +179,11 @@ export function EmployerJobsScreen() {
             </Pressable>
             <View style={styles.actions}>
               <Pressable
-                onPress={() => router.push(`/employer-jobs/${j.id}`)}
+                onPress={() =>
+  router.push(
+    `/employer-jobs/${j.id}` as any,
+  )
+}
                 style={[styles.actionBtn, styles.actionPrimary]}
                 testID={`view-applicants-${j.id}`}
               >
