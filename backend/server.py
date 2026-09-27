@@ -1,6 +1,9 @@
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from typing import Any, List
+from services.analytics import calculate_skill_demand
+from services.recommendations import recommend_jobs
+from services.matching import calculate_candidate_match
 
 import bcrypt
 import jwt
@@ -992,7 +995,8 @@ async def trainer_complete_enrollment(
 # ============================================================================
 # PHASE 4 — EMPLOYER PORTAL & RECRUITMENT   (Member 2)
 # Paste this whole block into server.py, directly ABOVE this line:
-#     # Include the router in the main app
+#    
+#  # Include the router in the main app
 #     app.include_router(api_router)
 # ============================================================================
 
@@ -1317,7 +1321,305 @@ async def job_candidate_matches(job_id: str, user: dict[str, Any] = Depends(requ
     return results[:50]
 
 
+# ---- Job Recommendations ----
 
+@api_router.get("/recommendations/jobs")
+async def job_recommendations(
+    user: dict[str, Any] = Depends(require_trainee),
+):
+    trainee_skills = await db.trainee_skills.find(
+        {"user_id": user["id"]},
+        {"_id": 0},
+    ).to_list(500)
+
+    jobs = await db.jobs.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(300)
+
+    return recommend_jobs(
+        jobs=jobs,
+        trainee_skills=trainee_skills,
+    )   
+
+
+
+# ---- Training Recommendations ----
+
+@api_router.get("/recommendations/training")
+async def training_recommendations(
+    user: dict[str, Any] = Depends(require_trainee),
+):
+    trainee_skills = await db.trainee_skills.find(
+        {"user_id": user["id"]},
+        {"_id": 0},
+    ).to_list(500)
+
+    proficiency_rank = {
+        "NONE": 0,
+        "BEGINNER": 1,
+        "INTERMEDIATE": 2,
+        "ADVANCED": 3,
+        "EXPERT": 4,
+    }
+
+    trainee_levels = {
+        skill.get("skill_id"): skill.get("level", "NONE")
+        for skill in trainee_skills
+    }
+
+    trainings = await db.trainings.find(
+        {},
+        {"_id": 0},
+    ).to_list(300)
+
+    recommendations = []
+
+    for training in trainings:
+        training_skills = training.get("skills", [])
+
+        if not training_skills:
+            continue
+
+        skill_gaps = []
+
+        for skill in training_skills:
+            skill_id = skill.get("skill_id")
+            target_level = skill.get(
+                "target_level",
+                "BEGINNER",
+            )
+
+            current_level = trainee_levels.get(
+                skill_id,
+                "NONE",
+            )
+
+            current_rank = proficiency_rank.get(
+                current_level,
+                0,
+            )
+
+            target_rank = proficiency_rank.get(
+                target_level,
+                1,
+            )
+
+            if current_rank < target_rank:
+                skill_gaps.append({
+                    "skill_id": skill_id,
+                    "current_level": current_level,
+                    "target_level": target_level,
+                })
+
+        if not skill_gaps:
+            continue
+
+        gap_percentage = round(
+            (len(skill_gaps) / len(training_skills)) * 100,
+            2,
+        )
+
+        recommendations.append({
+            "training_id": training.get("id"),
+            "title": training.get("title"),
+            "description": training.get("description"),
+            "provider": training.get("provider"),
+            "skills": training_skills,
+            "skill_gaps": skill_gaps,
+            "gap_percentage": gap_percentage,
+        })
+
+    recommendations.sort(
+        key=lambda item: item["gap_percentage"],
+        reverse=True,
+    )
+
+    return recommendations
+# ---- Labour Demand Analytics ----
+
+@api_router.get("/analytics/skill-demand")
+async def skill_demand_analytics(
+    _user: dict[str, Any] = Depends(current_user),
+):
+    jobs = await db.jobs.find(
+        {},
+        {"_id": 0, "skills": 1},
+    ).to_list(1000)
+
+    results = calculate_skill_demand(jobs)
+
+    skill_ids = [
+        item["skill_id"]
+        for item in results
+    ]
+
+    skills = await db.skills.find(
+        {"id": {"$in": skill_ids}},
+        {"_id": 0},
+    ).to_list(500)
+
+    skill_names = {
+        skill["id"]: skill.get(
+            "name",
+            skill["id"],
+        )
+        for skill in skills
+    }
+
+    for item in results:
+        item["skill_name"] = skill_names.get(
+            item["skill_id"],
+            item["skill_id"],
+        )
+
+    return results
+# ---- District Demand Analytics ----
+
+@api_router.get("/analytics/district-demand")
+async def district_demand_analytics(
+    _user: dict[str, Any] = Depends(current_user),
+):
+    jobs = await db.jobs.find(
+        {},
+        {"_id": 0, "location": 1},
+    ).to_list(1000)
+
+    demand: dict[str, int] = {}
+
+    for job in jobs:
+        location = job.get("location")
+
+        if not location:
+            continue
+
+        district = str(location).strip()
+
+        if district:
+            demand[district] = demand.get(district, 0) + 1
+
+    results = []
+
+    for district, count in demand.items():
+        results.append({
+            "district": district,
+            "demand_count": count,
+        })
+
+    results.sort(
+        key=lambda item: item["demand_count"],
+        reverse=True,
+    )
+
+    return results
+
+
+
+# ---- Candidate Matching ----
+
+@api_router.get("/matching/candidates/{job_id}")
+async def matching_candidates(
+    job_id: str,
+    user: dict[str, Any] = Depends(require_employer),
+):
+    job = await db.jobs.find_one(
+        {
+            "id": job_id,
+            "employer_user_id": user["id"],
+        },
+        {"_id": 0},
+    )
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found",
+        )
+
+    skill_ids = [
+        skill.get("skill_id")
+        for skill in job.get("skills", [])
+        if skill.get("skill_id")
+    ]
+
+    if not skill_ids:
+        return []
+
+    trainee_ids = await db.trainee_skills.distinct(
+        "user_id",
+        {"skill_id": {"$in": skill_ids}},
+    )
+
+    if not trainee_ids:
+        return []
+
+    trainees = await db.users.find(
+        {
+            "id": {"$in": trainee_ids},
+            "role": Role.TRAINEE.value,
+        },
+        {
+            "_id": 0,
+            "password_hash": 0,
+        },
+    ).to_list(500)
+
+    skills_by_user: dict[str, list] = {}
+
+    for row in await db.trainee_skills.find(
+        {"user_id": {"$in": trainee_ids}},
+        {"_id": 0},
+    ).to_list(3000):
+        skills_by_user.setdefault(
+            row["user_id"],
+            [],
+        ).append(row)
+
+    results = []
+
+    for trainee in trainees:
+        trainee_id = trainee["id"]
+
+        candidate_profile = {
+            "full_name": trainee.get("full_name"),
+            "experience_years": trainee.get(
+                "experience_years",
+                0,
+            ),
+            "qualification": trainee.get(
+                "qualification",
+                "",
+            ),
+        }
+
+        match = calculate_candidate_match(
+            job=job,
+            candidate_skills=skills_by_user.get(
+                trainee_id,
+                [],
+            ),
+            candidate_profile=candidate_profile,
+        )
+
+        match["candidate_id"] = trainee_id
+        match["candidate_name"] = trainee.get(
+            "full_name",
+            "Unknown",
+        )
+        match["email"] = trainee.get("email")
+        match["state_code"] = trainee.get("state_code")
+        match["district_code"] = trainee.get(
+            "district_code"
+        )
+
+        results.append(match)
+
+    results.sort(
+        key=lambda item: item["match_percentage"],
+        reverse=True,
+    )
+
+    return results[:50]
 
 
 # Include the router in the main app
