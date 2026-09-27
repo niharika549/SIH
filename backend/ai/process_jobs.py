@@ -8,12 +8,9 @@ from typing import Any
 
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+
 from backend.ai.skill_normalizer import normalize_skill
 
-
-# ---------------------------------------------------------
-# Paths and environment
-# ---------------------------------------------------------
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_DIR = BACKEND_DIR.parent
@@ -23,27 +20,31 @@ load_dotenv(BACKEND_DIR / ".env")
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 
-OUTPUT_FILE = PROJECT_DIR / "data" / "processed" / "jobs_processed.json"
+OUTPUT_FILE = (
+    PROJECT_DIR
+    / "data"
+    / "processed"
+    / "jobs_processed.json"
+)
 
-
-# ---------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------
 
 def clean_text(value: Any) -> str:
     """Clean extra spaces from text."""
+
     if value is None:
         return ""
 
     text = str(value)
     text = re.sub(r"\s+", " ", text)
+
     return text.strip()
 
 
+def normalize_skills(
+    skills: Any,
+) -> list[dict[str, Any]]:
+    """Normalize and clean job skills."""
 
-
-
-def normalize_skills(skills: Any) -> list[dict[str, Any]]:
     if not isinstance(skills, list):
         return []
 
@@ -61,7 +62,10 @@ def normalize_skills(skills: Any) -> list[dict[str, Any]]:
             continue
 
         required_level = clean_text(
-            skill.get("required_level", "BEGINNER")
+            skill.get(
+                "required_level",
+                "BEGINNER",
+            )
         ).upper()
 
         normalized.append({
@@ -87,39 +91,70 @@ def normalize_skills(skills: Any) -> list[dict[str, Any]]:
     return unique_skills
 
 
-def clean_job(job: dict[str, Any]) -> dict[str, Any]:
+def clean_job(
+    job: dict[str, Any],
+    industry: str = "",
+) -> dict[str, Any]:
     """Create a cleaned version of a job document."""
 
     return {
-        "id": clean_text(job.get("id")),
-        "title": clean_text(job.get("title")),
-        "description": clean_text(job.get("description")),
-        "skills": normalize_skills(job.get("skills", [])),
-        "location": clean_text(job.get("location")),
-        "salary_min": job.get("salary_min"),
-        "salary_max": job.get("salary_max"),
-        "experience_years": job.get("experience_years", 0),
+        "id": clean_text(
+            job.get("id")
+        ),
+        "title": clean_text(
+            job.get("title")
+        ),
+        "description": clean_text(
+            job.get("description")
+        ),
+        "skills": normalize_skills(
+            job.get("skills", [])
+        ),
+        "location": clean_text(
+            job.get("location")
+        ),
+        "industry": clean_text(
+            industry
+        ),
+        "salary_min": job.get(
+            "salary_min"
+        ),
+        "salary_max": job.get(
+            "salary_max"
+        ),
+        "experience_years": job.get(
+            "experience_years",
+            0,
+        ),
         "qualification": clean_text(
             job.get("qualification")
         ),
-        "openings": job.get("openings", 1),
+        "openings": job.get(
+            "openings",
+            1,
+        ),
         "company_name": clean_text(
             job.get("company_name")
         ),
         "status": clean_text(
-            job.get("status", "OPEN")
+            job.get(
+                "status",
+                "OPEN",
+            )
         ).upper(),
-        "created_at": job.get("created_at"),
-        "updated_at": job.get("updated_at"),
+        "created_at": job.get(
+            "created_at"
+        ),
+        "updated_at": job.get(
+            "updated_at"
+        ),
     }
 
 
-# ---------------------------------------------------------
-# Main processing
-# ---------------------------------------------------------
-
 async def process_jobs() -> None:
-    client = AsyncIOMotorClient(MONGO_URL)
+    client = AsyncIOMotorClient(
+        MONGO_URL
+    )
 
     try:
         db = client[DB_NAME]
@@ -129,13 +164,32 @@ async def process_jobs() -> None:
             {"_id": 0},
         ).to_list(5000)
 
+        employer_profiles = (
+            await db.employer_profiles.find(
+                {},
+                {
+                    "_id": 0,
+                    "user_id": 1,
+                    "industry": 1,
+                },
+            ).to_list(5000)
+        )
+
+        industry_by_user = {
+            profile.get("user_id"): clean_text(
+                profile.get("industry")
+            )
+            for profile in employer_profiles
+            if profile.get("user_id")
+        }
+
         processed_jobs = []
         seen_job_ids = set()
 
         for job in jobs:
-            cleaned = clean_job(job)
-
-            job_id = cleaned["id"]
+            job_id = clean_text(
+                job.get("id")
+            )
 
             if not job_id:
                 continue
@@ -144,13 +198,32 @@ async def process_jobs() -> None:
                 continue
 
             seen_job_ids.add(job_id)
-            processed_jobs.append(cleaned)
+
+            employer_user_id = job.get(
+                "employer_user_id"
+            )
+
+            industry = industry_by_user.get(
+                employer_user_id,
+                "",
+            )
+
+            cleaned = clean_job(
+                job,
+                industry=industry,
+            )
+
+            processed_jobs.append(
+                cleaned
+            )
 
         output = {
             "processed_at": datetime.now(
                 timezone.utc
             ).isoformat(),
-            "total_jobs": len(processed_jobs),
+            "total_jobs": len(
+                processed_jobs
+            ),
             "jobs": processed_jobs,
         }
 
@@ -185,4 +258,6 @@ async def process_jobs() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(process_jobs())
+    asyncio.run(
+        process_jobs()
+    )

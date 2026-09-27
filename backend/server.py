@@ -1,7 +1,10 @@
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from typing import Any, List
-from services.analytics import calculate_skill_demand
+from services.analytics import (
+    calculate_district_skill_demand,
+    calculate_skill_demand,
+)
 from services.recommendations import recommend_jobs
 from services.matching import calculate_candidate_match
 
@@ -1482,34 +1485,51 @@ async def district_demand_analytics(
 ):
     jobs = await db.jobs.find(
         {},
-        {"_id": 0, "location": 1},
+        {
+            "_id": 0,
+            "location": 1,
+            "skills": 1,
+        },
     ).to_list(1000)
 
-    demand: dict[str, int] = {}
-
-    for job in jobs:
-        location = job.get("location")
-
-        if not location:
-            continue
-
-        district = str(location).strip()
-
-        if district:
-            demand[district] = demand.get(district, 0) + 1
-
-    results = []
-
-    for district, count in demand.items():
-        results.append({
-            "district": district,
-            "demand_count": count,
-        })
-
-    results.sort(
-        key=lambda item: item["demand_count"],
-        reverse=True,
+    results = calculate_district_skill_demand(
+        jobs
     )
+
+    skill_ids = []
+
+    for district in results:
+        for skill in district["skills"]:
+            skill_id = skill["skill_id"]
+
+            if skill_id not in skill_ids:
+                skill_ids.append(skill_id)
+
+    skills = await db.skills.find(
+        {
+            "id": {
+                "$in": skill_ids
+            }
+        },
+        {
+            "_id": 0,
+        },
+    ).to_list(500)
+
+    skill_names = {
+        skill["id"]: skill.get(
+            "name",
+            skill["id"],
+        )
+        for skill in skills
+    }
+
+    for district in results:
+        for skill in district["skills"]:
+            skill["skill_name"] = skill_names.get(
+                skill["skill_id"],
+                skill["skill_id"],
+            )
 
     return results
 
