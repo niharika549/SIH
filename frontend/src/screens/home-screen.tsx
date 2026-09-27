@@ -5,7 +5,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 
 import { Link, router } from "expo-router";
-
 import {
   ActivityIndicator,
   Pressable,
@@ -13,7 +12,6 @@ import {
   Text,
   View,
 } from "react-native";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type {
@@ -45,28 +43,24 @@ const roleCopy = {
       "Build a verified skills profile for your next opportunity.",
     icon: "school-outline",
   },
-
   TRAINER: {
     title: "Your training workspace",
     subtitle:
       "Prepare to guide learners through measurable progress.",
     icon: "human-male-board",
   },
-
   EMPLOYER: {
     title: "Your hiring workspace",
     subtitle:
       "Connect verified skills to the workforce you need.",
     icon: "office-building-outline",
   },
-
   GOVERNMENT: {
     title: "Your intelligence workspace",
     subtitle:
       "Review workforce signals within your approved scope.",
     icon: "bank-outline",
   },
-
   ADMIN: {
     title: "Your control center",
     subtitle:
@@ -91,80 +85,73 @@ export function HomeScreen() {
   const content =
     roleCopy[user.role as keyof typeof roleCopy] ??
     roleCopy.TRAINEE;
-
   const firstName = user.full_name.split(" ")[0];
-
-  const bottomChrome = usesNativeTabs
-    ? insets.bottom
-    : 0;
+  const bottomChrome = usesNativeTabs ? insets.bottom : 0;
 
   return (
     <View style={styles.root}>
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: insets.top + 18,
-            paddingBottom: bottomChrome + 24,
+            paddingTop: insets.top + 16,
+            paddingBottom: bottomChrome + 32,
           },
         ]}
       >
+        {/* --------------------------------------------------------------- */}
+        {/* HEADER                                                         */}
+        {/* --------------------------------------------------------------- */}
+
         <View style={styles.topRow}>
           <BrandHeader compact />
 
           <View style={styles.roleBadge}>
             <MaterialCommunityIcons
               name={content.icon}
-              size={16}
+              size={15}
               color={colors.onBrandTertiary}
             />
-
-            <Text style={styles.roleText}>
-              {user.role}
-            </Text>
+            <Text style={styles.roleText}>{user.role}</Text>
           </View>
         </View>
 
-        <Text style={styles.eyebrow}>
-          HELLO, {firstName.toUpperCase()}
-        </Text>
+        {/* --------------------------------------------------------------- */}
+        {/* GREETING                                                        */}
+        {/* --------------------------------------------------------------- */}
 
-        <Text style={styles.title}>
-          {content.title}
-        </Text>
+        <View style={styles.greetingBlock}>
+          <Text style={styles.eyebrow}>
+            WELCOME BACK, {firstName.toUpperCase()}
+          </Text>
 
-        <Text style={styles.subtitle}>
-          {content.subtitle}
-        </Text>
+          <Text style={styles.title}>{content.title}</Text>
 
-        {user.role === "TRAINEE" ? (
-          <TraineeDashboard />
-        ) : null}
+          <Text style={styles.subtitle}>{content.subtitle}</Text>
+        </View>
 
-        {user.role === "TRAINER" ? (
-          <TrainerDashboard />
-        ) : null}
+        {/* --------------------------------------------------------------- */}
+        {/* ROLE DASHBOARDS                                                  */}
+        {/* --------------------------------------------------------------- */}
 
-        {user.role === "ADMIN" ? (
-          <AdminDashboard />
-        ) : null}
+        {user.role === "TRAINEE" ? <TraineeDashboard /> : null}
 
-        {user.role === "EMPLOYER" ? (
-          <EmployerDashboard />
-        ) : null}
+        {user.role === "TRAINER" ? <TrainerDashboard /> : null}
 
-        {user.role === "GOVERNMENT" ? (
-          <GovernmentDashboard />
-        ) : null}
+        {user.role === "ADMIN" ? <AdminDashboard /> : null}
+
+        {user.role === "EMPLOYER" ? <EmployerDashboard /> : null}
+
+        {user.role === "GOVERNMENT" ? <GovernmentDashboard /> : null}
       </ScrollView>
     </View>
   );
 }
 
-
-/* =========================
-   TRAINEE DASHBOARD
-========================= */
+/* ========================================================================= */
+/* TRAINEE DASHBOARD                                                        */
+/* ========================================================================= */
 
 function TraineeDashboard() {
   const styles = useStyles();
@@ -195,48 +182,110 @@ function TraineeDashboard() {
 
   const percent =
     gap && gap.total > 0
-      ? Math.round(
-          (gap.matched / gap.total) * 100,
-        )
+      ? Math.round((gap.matched / gap.total) * 100)
       : 0;
 
-  const nextSkill = gap?.items.find(
-    (i) => i.status !== "MET",
-  );
+  const nextSkill = gap?.items.find((item) => item.status !== "MET");
+
+  const isComplete = gap ? percent >= 100 : false;
 
   return (
     <View>
-      <View style={styles.heroCard}>
-        <View style={styles.heroIcon}>
-          <MaterialCommunityIcons
-            name="progress-check"
-            size={24}
-            color={colors.onBrandPrimary}
+      {/* ----------------------------------------------------------------- */}
+      {/* CAREER READINESS CARD                                            */}
+      {/* ----------------------------------------------------------------- */}
+
+      <View style={styles.readinessCard}>
+        <View style={styles.readinessTopRow}>
+          <View style={styles.readinessIcon}>
+            <MaterialCommunityIcons
+              name="target"
+              size={25}
+              color={colors.onBrandPrimary}
+            />
+          </View>
+
+          <View style={styles.readinessLabelContainer}>
+            <Text style={styles.readinessLabel}>CAREER READINESS</Text>
+
+            <Text style={styles.readinessCareer}>
+              {gap ? gap.career_name : "Career goal not set"}
+            </Text>
+          </View>
+
+          <Text style={styles.readinessPercent}>{percent}%</Text>
+        </View>
+
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${Math.min(percent, 100)}%`,
+              },
+            ]}
           />
         </View>
 
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroTitle}>
-            {gap
-              ? gap.career_name
-              : "Set a career goal"}
+        <Text style={styles.readinessDescription}>
+          {gap
+            ? `${gap.matched} of ${gap.total} required skills currently meet your career target.`
+            : "Choose a career goal to see your skill readiness."}
+        </Text>
+      </View>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* NEXT STEP                                                         */}
+      {/* ----------------------------------------------------------------- */}
+
+      <View style={styles.nextStepCard}>
+        <View style={styles.nextStepIcon}>
+          <MaterialCommunityIcons
+            name={isComplete ? "check-decagram" : "lightbulb-on-outline"}
+            size={23}
+            color={colors.brandSecondary}
+          />
+        </View>
+
+        <View style={styles.nextStepContent}>
+          <Text style={styles.smallLabel}>
+            {isComplete ? "CAREER GOAL ACHIEVED" : "YOUR NEXT STEP"}
           </Text>
 
-          <Text style={styles.heroText}>
+          <Text style={styles.nextStepTitle}>
             {gap
-              ? `${gap.matched} of ${gap.total} required skills met (${percent}%). ${
-                  nextSkill
-                    ? `Next up: ${nextSkill.skill_name}.`
-                    : "You're on track!"
-                }`
-              : "Choose a career from your profile to start closing skill gaps."}
+              ? isComplete
+                ? "All required skills are covered"
+                : nextSkill
+                  ? `Improve ${nextSkill.skill_name}`
+                  : "Continue building your profile"
+              : "Set your career goal"}
+          </Text>
+
+          <Text style={styles.nextStepText}>
+            {gap
+              ? isComplete
+                ? "Keep your verified skills updated as industry requirements change."
+                : nextSkill
+                  ? `Assess or improve this skill to move closer to your ${gap.career_name} goal.`
+                  : "Continue assessing your skills to strengthen your profile."
+              : "Choose a target career to unlock personalized skill-gap insights."}
           </Text>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>
-        Quick actions
-      </Text>
+      {/* ----------------------------------------------------------------- */}
+      {/* QUICK ACTIONS                                                     */}
+      {/* ----------------------------------------------------------------- */}
+
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>Quick actions</Text>
+          <Text style={styles.sectionSubtitle}>
+            Continue building your career profile
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.grid}>
         <ActionCard
@@ -249,14 +298,13 @@ function TraineeDashboard() {
           }
           text={
             nextSkill
-              ? "Turn this gap into a proven level"
+              ? "Turn this gap into a proven skill level"
               : "Prove your strongest skill"
           }
+          accent="blue"
           onPress={() =>
             nextSkill
-              ? router.push(
-                  `/assessment/${nextSkill.skill_id}`,
-                )
+              ? router.push(`/assessment/${nextSkill.skill_id}`)
               : router.push("/skills")
           }
         />
@@ -266,100 +314,146 @@ function TraineeDashboard() {
           icon="target"
           title="Skill gap"
           text="See what stands between you and your goal"
-          onPress={() =>
-            router.push("/career")
-          }
+          accent="green"
+          onPress={() => router.push("/career")}
         />
 
         <ActionCard
           testID="action-view-skills"
           icon="format-list-checks"
           title="My skills"
-          text="Self-declare or reassess any skill"
-          onPress={() =>
-            router.push("/skills")
-          }
+          text="Self-declare or reassess your skills"
+          accent="purple"
+          onPress={() => router.push("/skills")}
         />
 
         <ActionCard
           testID="action-view-training"
           icon="school-outline"
           title="Recommended courses"
-          text="Sample training that closes your gaps"
-          onPress={() =>
-            router.push("/career")
-          }
+          text="Find training that closes your gaps"
+          accent="orange"
+          onPress={() => router.push("/career")}
         />
       </View>
 
-      {historyQuery.data &&
-      historyQuery.data.length > 0 ? (
-        <View>
-          <Text style={styles.sectionTitle}>
-            Recent assessments
+      {/* ----------------------------------------------------------------- */}
+      {/* AI INSIGHT                                                        */}
+      {/* ----------------------------------------------------------------- */}
+
+      {gap ? (
+        <View style={styles.aiCard}>
+          <View style={styles.aiHeader}>
+            <View style={styles.aiIcon}>
+              <MaterialCommunityIcons
+                name="brain"
+                size={21}
+                color={colors.onBrandPrimary}
+              />
+            </View>
+
+            <View style={styles.aiTitleContainer}>
+              <Text style={styles.aiLabel}>SKILLALIGN INSIGHT</Text>
+              <Text style={styles.aiTitle}>Your current focus</Text>
+            </View>
+          </View>
+
+          <Text style={styles.aiText}>
+            {isComplete
+              ? `Your assessed skills currently cover all required skills for ${gap.career_name}. Keep your profile updated as requirements change.`
+              : nextSkill
+                ? `${nextSkill.skill_name} is currently one of the skills that needs improvement for your ${gap.career_name} goal.`
+                : `Continue assessing your skills to build a stronger ${gap.career_name} profile.`}
           </Text>
+        </View>
+      ) : null}
 
-          {historyQuery.data
-            .slice(0, 3)
-            .map((h) => (
-              <View
-                key={h.id}
-                style={styles.historyRow}
-                testID={`history-${h.id}`}
-              >
-                <View style={styles.historyCopy}>
-                  <Text style={styles.historyTitle}>
-                    {h.skill_id
-                      .replace(/^skill-/, "")
-                      .replace(/-/g, " ")}
-                  </Text>
+      {/* ----------------------------------------------------------------- */}
+      {/* RECENT ASSESSMENTS                                                */}
+      {/* ----------------------------------------------------------------- */}
 
-                  <Text style={styles.historyMeta}>
-                    {h.percentage}% ·{" "}
-                    {
-                      PROFICIENCY_LABEL[
-                        h.proficiency
-                      ]
-                    }{" "}
-                    ·{" "}
-                    {new Date(
-                      h.submitted_at,
-                    ).toLocaleDateString()}
-                  </Text>
-                </View>
+      {historyQuery.data && historyQuery.data.length > 0 ? (
+        <View>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Recent assessments</Text>
+              <Text style={styles.sectionSubtitle}>
+                Your latest verified progress
+              </Text>
+            </View>
+          </View>
 
+          {historyQuery.data.slice(0, 3).map((h) => (
+            <View
+              key={h.id}
+              style={styles.historyRow}
+              testID={`history-${h.id}`}
+            >
+              <View style={styles.historyIcon}>
                 <MaterialCommunityIcons
                   name="check-decagram"
-                  size={20}
-                  color={colors.brandPrimary}
+                  size={19}
+                  color={colors.brandSecondary}
                 />
               </View>
-            ))}
+
+              <View style={styles.historyCopy}>
+                <Text style={styles.historyTitle}>
+                  {h.skill_id
+                    .replace(/^skill-/, "")
+                    .replace(/-/g, " ")}
+                </Text>
+
+                <Text style={styles.historyMeta}>
+                  {h.percentage}% · {PROFICIENCY_LABEL[h.proficiency]} ·{" "}
+                  {new Date(h.submitted_at).toLocaleDateString()}
+                </Text>
+              </View>
+
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={20}
+                color={colors.muted}
+              />
+            </View>
+          ))}
         </View>
       ) : null}
 
-      {gapQuery.isPending ||
-      historyQuery.isPending ? (
+      {/* ----------------------------------------------------------------- */}
+      {/* LOADING                                                           */}
+      {/* ----------------------------------------------------------------- */}
+
+      {gapQuery.isPending || historyQuery.isPending ? (
         <View style={styles.centered}>
-          <ActivityIndicator
-            color={colors.brandPrimary}
-          />
+          <ActivityIndicator color={colors.brandPrimary} />
         </View>
       ) : null}
+
+      {/* ----------------------------------------------------------------- */}
+      {/* PROFILE LINK                                                      */}
+      {/* ----------------------------------------------------------------- */}
 
       <Link href="/profile" asChild>
-        <Text style={styles.profileLink}>
-          Review account and access details →
-        </Text>
+        <Pressable style={styles.profileLinkContainer}>
+          <Text style={styles.profileLink}>
+            Review account and access details
+          </Text>
+
+          <MaterialCommunityIcons
+            name="arrow-right"
+            size={18}
+            color={colors.brandPrimary}
+          />
+        </Pressable>
       </Link>
     </View>
   );
 }
 
-
-/* =========================
-   TRAINER DASHBOARD
-========================= */
+/* ========================================================================= */
+/* TRAINER DASHBOARD                                                        */
+/* ========================================================================= */
 
 function TrainerDashboard() {
   const styles = useStyles();
@@ -377,46 +471,46 @@ function TrainerDashboard() {
 
   const enrollmentsQuery = useQuery({
     queryKey: ["trainer", "enrollments"],
-
     queryFn: () =>
-      authed<{ status: string }[]>(
-        "/trainer/enrollments",
-      ),
+      authed<{ status: string }[]>("/trainer/enrollments"),
   });
 
-  const active = (
-    enrollmentsQuery.data ?? []
-  ).filter(
+  const active = (enrollmentsQuery.data ?? []).filter(
     (e) => e.status === "ENROLLED",
   ).length;
 
   return (
     <View>
-      <View style={styles.heroCard}>
-        <View style={styles.heroIcon}>
+      <View style={styles.workspaceCard}>
+        <View style={styles.workspaceIcon}>
           <MaterialCommunityIcons
             name="human-male-board"
-            size={24}
+            size={26}
             color={colors.onBrandPrimary}
           />
         </View>
 
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroTitle}>
-            {trainingsQuery.data?.length ?? 0}{" "}
-            trainings · {active} active learners
+        <View style={styles.workspaceContent}>
+          <Text style={styles.workspaceLabel}>TRAINING WORKSPACE</Text>
+
+          <Text style={styles.workspaceTitle}>
+            {trainingsQuery.data?.length ?? 0} trainings
           </Text>
 
-          <Text style={styles.heroText}>
-            Publish courses, then verify learner
-            skills.
+          <Text style={styles.workspaceText}>
+            {active} active learners currently enrolled.
           </Text>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>
-        Quick actions
-      </Text>
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>Quick actions</Text>
+          <Text style={styles.sectionSubtitle}>
+            Manage your training workspace
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.grid}>
         <ActionCard
@@ -424,9 +518,8 @@ function TrainerDashboard() {
           icon="plus-circle-outline"
           title="New training"
           text="Publish a course for trainees"
-          onPress={() =>
-            router.push("/trainings")
-          }
+          accent="blue"
+          onPress={() => router.push("/trainings")}
         />
 
         <ActionCard
@@ -434,19 +527,17 @@ function TrainerDashboard() {
           icon="account-group-outline"
           title="Learners"
           text="Complete and verify skills"
-          onPress={() =>
-            router.push("/learners")
-          }
+          accent="green"
+          onPress={() => router.push("/learners")}
         />
 
         <ActionCard
           testID="action-trainer-profile"
           icon="badge-account-horizontal-outline"
           title="My profile"
-          text="Headline, skills, institution"
-          onPress={() =>
-            router.push("/trainer-profile")
-          }
+          text="Headline, skills and institution"
+          accent="purple"
+          onPress={() => router.push("/trainer-profile")}
         />
 
         <ActionCard
@@ -454,19 +545,90 @@ function TrainerDashboard() {
           icon="book-open-variant"
           title="My trainings"
           text="Edit or close your courses"
-          onPress={() =>
-            router.push("/trainings")
-          }
+          accent="orange"
+          onPress={() => router.push("/trainings")}
         />
       </View>
     </View>
   );
 }
 
+/* ========================================================================= */
+/* ADMIN DASHBOARD                                                          */
+/* ========================================================================= */
 
-/* =========================
-   EMPLOYER DASHBOARD
-========================= */
+function AdminDashboard() {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const authed = useAuthedRequest();
+
+  const pendingQuery = useQuery({
+    queryKey: ["admin", "pending-users"],
+    queryFn: () =>
+      authed<{ length: number }[]>("/admin/pending-users"),
+  });
+
+  const pending = pendingQuery.data?.length ?? 0;
+
+  return (
+    <View>
+      <View style={styles.workspaceCard}>
+        <View style={styles.workspaceIcon}>
+          <MaterialCommunityIcons
+            name="shield-account-outline"
+            size={26}
+            color={colors.onBrandPrimary}
+          />
+        </View>
+
+        <View style={styles.workspaceContent}>
+          <Text style={styles.workspaceLabel}>CONTROL CENTER</Text>
+
+          <Text style={styles.workspaceTitle}>
+            {pending} pending {pending === 1 ? "account" : "accounts"}
+          </Text>
+
+          <Text style={styles.workspaceText}>
+            Accounts currently awaiting verification.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>Quick actions</Text>
+          <Text style={styles.sectionSubtitle}>
+            Manage platform access
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.grid}>
+        <ActionCard
+          testID="action-approvals"
+          icon="check-decagram-outline"
+          title="Verification queue"
+          text="Approve or reject pending accounts"
+          accent="green"
+          onPress={() => router.push("/approvals")}
+        />
+
+        <ActionCard
+          testID="action-admin-profile"
+          icon="account-cog-outline"
+          title="Admin profile"
+          text="Session and access details"
+          accent="blue"
+          onPress={() => router.push("/profile")}
+        />
+      </View>
+    </View>
+  );
+}
+
+/* ========================================================================= */
+/* EMPLOYER DASHBOARD                                                        */
+/* ========================================================================= */
 
 function EmployerDashboard() {
   const styles = useStyles();
@@ -475,16 +637,13 @@ function EmployerDashboard() {
 
   const jobsQuery = useQuery({
     queryKey: ["employer", "jobs"],
-
     queryFn: () =>
       authed<{ status: string }[]>(
         "/employer/jobs",
       ),
   });
 
-  const openJobs = (
-    jobsQuery.data ?? []
-  ).filter(
+  const openJobs = (jobsQuery.data ?? []).filter(
     (j) => j.status === "OPEN",
   ).length;
 
@@ -524,9 +683,7 @@ function EmployerDashboard() {
           title="Post a job"
           text="Publish a new opening"
           onPress={() =>
-            router.push(
-              "/employer-jobs" as any,
-            )
+            router.push("/employer-jobs" as any)
           }
         />
 
@@ -536,9 +693,7 @@ function EmployerDashboard() {
           title="My jobs"
           text="Edit, close, view applicants"
           onPress={() =>
-            router.push(
-              "/employer-jobs" as any,
-            )
+            router.push("/employer-jobs" as any)
           }
         />
 
@@ -547,95 +702,16 @@ function EmployerDashboard() {
           icon="domain"
           title="Company profile"
           text="Name, industry, location"
-          onPress={() =>
-            router.push("/profile")
-          }
+          onPress={() => router.push("/profile")}
         />
       </View>
     </View>
   );
 }
 
-
-/* =========================
-   ADMIN DASHBOARD
-========================= */
-
-function AdminDashboard() {
-  const styles = useStyles();
-  const { colors } = useTheme();
-  const authed = useAuthedRequest();
-
-  const pendingQuery = useQuery({
-    queryKey: ["admin", "pending-users"],
-
-    queryFn: () =>
-      authed<{ length: number }[]>(
-        "/admin/pending-users",
-      ),
-  });
-
-  const pending =
-    pendingQuery.data?.length ?? 0;
-
-  return (
-    <View>
-      <View style={styles.heroCard}>
-        <View style={styles.heroIcon}>
-          <MaterialCommunityIcons
-            name="shield-account-outline"
-            size={24}
-            color={colors.onBrandPrimary}
-          />
-        </View>
-
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroTitle}>
-            {pending} account
-            {pending === 1 ? "" : "s"} awaiting
-            verification
-          </Text>
-
-          <Text style={styles.heroText}>
-            Manage account approvals and platform
-            access.
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>
-        Quick actions
-      </Text>
-
-      <View style={styles.grid}>
-        <ActionCard
-          testID="action-approvals"
-          icon="check-decagram-outline"
-          title="Verification queue"
-          text="Approve or reject pending accounts"
-          onPress={() =>
-            router.push("/approvals")
-          }
-        />
-
-        <ActionCard
-          testID="action-admin-profile"
-          icon="account-cog-outline"
-          title="Admin profile"
-          text="Session and access details"
-          onPress={() =>
-            router.push("/profile")
-          }
-        />
-      </View>
-    </View>
-  );
-}
-
-
-/* =========================
-   GOVERNMENT DASHBOARD
-========================= */
+/* ========================================================================= */
+/* GOVERNMENT DASHBOARD                                                     */
+/* ========================================================================= */
 
 function GovernmentDashboard() {
   const styles = useStyles();
@@ -659,24 +735,19 @@ function GovernmentDashboard() {
 
   const dashboardQuery = useQuery({
     queryKey: ["government", "dashboard"],
-
     queryFn: () =>
       authed<DashboardResponse>(
         "/government/dashboard",
       ),
-
     retry: false,
   });
 
-  const statistics =
-    dashboardQuery.data?.statistics;
+  const statistics = dashboardQuery.data?.statistics;
 
   if (dashboardQuery.isPending) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator
-          color={colors.brandPrimary}
-        />
+        <ActivityIndicator color={colors.brandPrimary} />
       </View>
     );
   }
@@ -685,10 +756,8 @@ function GovernmentDashboard() {
     return (
       <View style={styles.infoCard}>
         <Text style={styles.infoText}>
-          Unable to load government dashboard
-          data.
+          Unable to load government dashboard data.
         </Text>
-
         <Text style={styles.infoText}>
           Please try again later.
         </Text>
@@ -698,8 +767,6 @@ function GovernmentDashboard() {
 
   return (
     <View>
-      {/* HERO CARD */}
-
       <View style={styles.heroCard}>
         <View style={styles.heroIcon}>
           <MaterialCommunityIcons
@@ -721,9 +788,6 @@ function GovernmentDashboard() {
         </View>
       </View>
 
-
-      {/* PLATFORM OVERVIEW */}
-
       <Text style={styles.sectionTitle}>
         Platform Overview
       </Text>
@@ -733,45 +797,30 @@ function GovernmentDashboard() {
           <Text style={styles.statValue}>
             {statistics?.total_users ?? 0}
           </Text>
-
-          <Text style={styles.statLabel}>
-            Total Users
-          </Text>
+          <Text style={styles.statLabel}>Total Users</Text>
         </View>
 
         <View style={styles.statCard}>
           <Text style={styles.statValue}>
             {statistics?.total_trainees ?? 0}
           </Text>
-
-          <Text style={styles.statLabel}>
-            Trainees
-          </Text>
+          <Text style={styles.statLabel}>Trainees</Text>
         </View>
 
         <View style={styles.statCard}>
           <Text style={styles.statValue}>
             {statistics?.total_trainers ?? 0}
           </Text>
-
-          <Text style={styles.statLabel}>
-            Trainers
-          </Text>
+          <Text style={styles.statLabel}>Trainers</Text>
         </View>
 
         <View style={styles.statCard}>
           <Text style={styles.statValue}>
             {statistics?.total_trainings ?? 0}
           </Text>
-
-          <Text style={styles.statLabel}>
-            Trainings
-          </Text>
+          <Text style={styles.statLabel}>Trainings</Text>
         </View>
       </View>
-
-
-      {/* GOVERNMENT MODULES */}
 
       <Text style={styles.sectionTitle}>
         Government Modules
@@ -784,9 +833,7 @@ function GovernmentDashboard() {
           title="District Analytics"
           text="View district-wise skill demand and supply"
           onPress={() =>
-            router.push(
-              "/government-district-analytics" as any,
-            )
+            router.push("/government-district-analytics" as any)
           }
         />
 
@@ -796,9 +843,7 @@ function GovernmentDashboard() {
           title="Skill Analytics"
           text="Analyze demanded and emerging skills"
           onPress={() =>
-            router.push(
-              "/government-skill-analytics" as any,
-            )
+            router.push("/government-skill-analytics" as any)
           }
         />
 
@@ -808,9 +853,7 @@ function GovernmentDashboard() {
           title="Regional Skill Map"
           text="View India, state, and district skill demand"
           onPress={() =>
-            router.push(
-              "/government-regional-map" as any,
-            )
+            router.push("/government-regional-map" as any)
           }
         />
 
@@ -820,9 +863,7 @@ function GovernmentDashboard() {
           title="Future Skill Demand Forecast"
           text="Explore emerging job and skill trends"
           onPress={() =>
-            router.push(
-              "/government-skill-forecast" as any,
-            )
+            router.push("/government-skill-forecast" as any)
           }
         />
 
@@ -832,9 +873,7 @@ function GovernmentDashboard() {
           title="Training & Trainer Readiness"
           text="Check training seats, trainers, and district gaps"
           onPress={() =>
-            router.push(
-              "/government-training-readiness" as any,
-            )
+            router.push("/government-training-readiness" as any)
           }
         />
 
@@ -844,9 +883,7 @@ function GovernmentDashboard() {
           title="Funding & Resource Allocation"
           text="Plan district funding, training seats, trainers and resources"
           onPress={() =>
-            router.push(
-              "/government-funding-allocation" as any,
-            )
+            router.push("/government-funding-allocation" as any)
           }
         />
 
@@ -856,9 +893,7 @@ function GovernmentDashboard() {
           title="Reports"
           text="Generate workforce and training reports"
           onPress={() =>
-            router.push(
-              "/government-reports" as any,
-            )
+            router.push("/government-reports" as any)
           }
         />
 
@@ -868,15 +903,10 @@ function GovernmentDashboard() {
           title="Notifications"
           text="View government alerts and updates"
           onPress={() =>
-            router.push(
-              "/government-notifications" as any,
-            )
+            router.push("/government-notifications" as any)
           }
         />
       </View>
-
-
-      {/* ENROLLMENT OVERVIEW */}
 
       <Text style={styles.sectionTitle}>
         Enrollment Overview
@@ -887,12 +917,10 @@ function GovernmentDashboard() {
           Total Enrollments:{" "}
           {statistics?.total_enrollments ?? 0}
         </Text>
-
         <Text style={styles.infoText}>
           Active Enrollments:{" "}
           {statistics?.active_enrollments ?? 0}
         </Text>
-
         <Text style={styles.infoText}>
           Completed Enrollments:{" "}
           {statistics?.completed_enrollments ?? 0}
@@ -902,172 +930,168 @@ function GovernmentDashboard() {
   );
 }
 
-
-/* =========================
-   ACTION CARD
-========================= */
-
-type ActionCardProps = {
-  testID?: string;
-  icon: string;
-  title: string;
-  text: string;
-  onPress: () => void;
-};
+/* ========================================================================= */
+/* ACTION CARD                                                              */
+/* ========================================================================= */
 
 function ActionCard({
-  testID,
   icon,
   title,
   text,
   onPress,
-}: ActionCardProps) {
+  testID,
+  accent = "blue",
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  text: string;
+  onPress: () => void;
+  testID: string;
+  accent?: "blue" | "green" | "purple" | "orange";
+}) {
   const styles = useStyles();
   const { colors } = useTheme();
 
+  const accentColor =
+    accent === "green"
+      ? colors.brandSecondary
+      : accent === "purple"
+        ? "#9B7CFF"
+        : accent === "orange"
+          ? "#F59E0B"
+          : colors.brandPrimary;
+
   return (
     <Pressable
-      testID={testID}
-      style={({ pressed }) => [
-        styles.actionCard,
-        pressed &&
-          styles.actionCardPressed,
-      ]}
       onPress={onPress}
+      style={({ pressed }) => [
+        styles.infoCard,
+        pressed && styles.pressed,
+      ]}
+      testID={testID}
+      accessibilityRole="button"
     >
-      <View style={styles.actionIcon}>
+      <View
+        style={[
+          styles.actionIcon,
+          {
+            backgroundColor: `${accentColor}22`,
+          },
+        ]}
+      >
         <MaterialCommunityIcons
-          name={icon as any}
-          size={24}
-          color={colors.brandPrimary}
+          name={icon}
+          size={21}
+          color={accentColor}
         />
       </View>
 
-      <Text style={styles.actionTitle}>
-        {title}
-      </Text>
+      <Text style={styles.infoTitle}>{title}</Text>
 
-      <Text style={styles.actionText}>
-        {text}
-      </Text>
+      <Text style={styles.infoText}>{text}</Text>
 
       <View style={styles.actionArrow}>
         <MaterialCommunityIcons
           name="arrow-right"
-          size={18}
-          color={colors.brandPrimary}
+          size={16}
+          color={colors.muted}
         />
       </View>
     </Pressable>
   );
 }
 
-
-/* =========================
-   NON-TRAINEE PLACEHOLDER
-========================= */
-
-function NonTraineePlaceholder() {
-  const styles = useStyles();
-  const { colors } = useTheme();
-
-  return (
-    <View style={styles.heroCard}>
-      <View style={styles.heroIcon}>
-        <MaterialCommunityIcons
-          name="information-outline"
-          size={24}
-          color={colors.onBrandPrimary}
-        />
-      </View>
-
-      <View style={styles.heroCopy}>
-        <Text style={styles.heroTitle}>
-          Workspace coming soon
-        </Text>
-
-        <Text style={styles.heroText}>
-          Your workspace features will be
-          available soon. Please check your
-          profile for account details.
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-
-/* =========================
-   STYLES
-========================= */
+/* ========================================================================= */
+/* STYLES                                                                   */
+/* ========================================================================= */
 
 const useStyles = makeStyles((colors) => ({
   root: {
-    flex: 1,
     backgroundColor: colors.surface,
+    flex: 1,
   },
 
   content: {
-    paddingHorizontal: 20,
+    gap: 10,
+    paddingHorizontal: 18,
   },
 
+  /* --------------------------------------------------------------------- */
+  /* HEADER                                                                */
+  /* --------------------------------------------------------------------- */
+
   topRow: {
-    flexDirection: "row",
     alignItems: "center",
+    flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 24,
   },
 
   roleBadge: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
     backgroundColor: colors.brandTertiary,
+    borderColor: colors.borderStrong,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingVertical: 7,
   },
 
   roleText: {
     color: colors.onBrandTertiary,
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+
+  /* --------------------------------------------------------------------- */
+  /* GREETING                                                              */
+  /* --------------------------------------------------------------------- */
+
+  greetingBlock: {
+    gap: 5,
+    marginTop: 18,
   },
 
   eyebrow: {
-    color: colors.brandPrimary,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 8,
+    color: colors.brandSecondary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.3,
   },
 
   title: {
     color: colors.onSurface,
     fontSize: 28,
     fontWeight: "800",
-    marginBottom: 8,
+    lineHeight: 34,
   },
 
   subtitle: {
-    color: colors.onSurfaceSecondary,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 24,
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    maxWidth: 350,
   },
 
+  /* --------------------------------------------------------------------- */
+  /* EMPLOYER / GOVERNMENT HERO                                             */
+  /* --------------------------------------------------------------------- */
+
   heroCard: {
-    flexDirection: "row",
     alignItems: "flex-start",
     backgroundColor: colors.brandPrimary,
     borderRadius: 20,
+    flexDirection: "row",
+    marginTop: 18,
+    marginBottom: 20,
     padding: 18,
-    marginBottom: 26,
   },
 
   heroIcon: {
     marginRight: 12,
+    paddingTop: 1,
   },
 
   heroCopy: {
@@ -1087,71 +1111,177 @@ const useStyles = makeStyles((colors) => ({
     lineHeight: 20,
   },
 
-  sectionTitle: {
-    color: colors.onSurface,
-    fontSize: 19,
-    fontWeight: "800",
-    marginBottom: 14,
-    marginTop: 8,
+  /* --------------------------------------------------------------------- */
+  /* --------------------------------------------------------------------- */
+  /* TRAINEE READINESS                                                     */
+  /* --------------------------------------------------------------------- */
+
+  readinessCard: {
+    backgroundColor: colors.brandPrimary,
+    borderRadius: 22,
+    gap: 15,
+    marginTop: 18,
+    padding: 18,
   },
 
-  grid: {
+  readinessTopRow: {
+    alignItems: "center",
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 12,
-    marginBottom: 20,
   },
 
-  actionCard: {
-    width: "48%",
-    minHeight: 175,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: 18,
-    padding: 14,
+  readinessIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(24, 217, 155, 0.22)",
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: colors.border,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
   },
 
-  actionCardPressed: {
-    opacity: 0.7,
+  readinessLabelContainer: {
+    flex: 1,
+    gap: 3,
   },
 
-  actionIcon: {
-    marginBottom: 12,
+  readinessLabel: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.2,
   },
 
-  actionTitle: {
-    color: colors.onSurface,
-    fontSize: 14,
+  readinessCareer: {
+    color: "#FFFFFF",
+    fontSize: 15,
     fontWeight: "800",
-    marginBottom: 6,
   },
 
-  actionText: {
-    color: colors.onSurfaceSecondary,
+  readinessPercent: {
+    color: colors.brandSecondary,
+    fontSize: 25,
+    fontWeight: "900",
+  },
+
+  progressTrack: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    height: 8,
+    overflow: "hidden",
+    width: "100%",
+  },
+
+  progressFill: {
+    backgroundColor: colors.brandSecondary,
+    borderRadius: 999,
+    height: "100%",
+  },
+
+  readinessDescription: {
+    color: "rgba(255,255,255,0.82)",
     fontSize: 12,
     lineHeight: 18,
   },
 
-  actionArrow: {
-    marginTop: "auto",
-    alignItems: "flex-end",
+  /* --------------------------------------------------------------------- */
+  /* NEXT STEP                                                             */
+  /* --------------------------------------------------------------------- */
+
+  nextStepCard: {
+    alignItems: "flex-start",
+    backgroundColor: colors.surfaceSecondary,
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 2,
+    padding: 15,
+  },
+
+  nextStepIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(24, 217, 155, 0.12)",
+    borderRadius: 13,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+
+  nextStepContent: {
+    flex: 1,
+    gap: 4,
+  },
+
+  smallLabel: {
+    color: colors.brandSecondary,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+
+  nextStepTitle: {
+    color: colors.onSurface,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  nextStepText: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  /* --------------------------------------------------------------------- */
+  /* SECTION HEADERS                                                       */
+  /* --------------------------------------------------------------------- */
+
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 21,
+  },
+
+  sectionTitle: {
+    color: colors.onSurface,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+
+  sectionSubtitle: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+
+  /* --------------------------------------------------------------------- */
+  /* ACTION GRID                                                           */
+  /* --------------------------------------------------------------------- */
+
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 10,
   },
 
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 10,
   },
 
   statCard: {
-    width: "48%",
     backgroundColor: colors.surfaceSecondary,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    width: "48%",
   },
 
   statValue: {
@@ -1162,64 +1292,223 @@ const useStyles = makeStyles((colors) => ({
   },
 
   statLabel: {
-    color: colors.onSurfaceSecondary,
+    color: colors.muted,
     fontSize: 12,
   },
 
   infoCard: {
     backgroundColor: colors.surfaceSecondary,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 20,
+    borderRadius: 17,
+    borderWidth: 1,
+    gap: 6,
+    minHeight: 142,
+    padding: 14,
+    position: "relative",
+    width: "48%",
+  },
+
+  actionIcon: {
+    alignItems: "center",
+    borderRadius: 11,
+    height: 39,
+    justifyContent: "center",
+    width: 39,
+  },
+
+  infoTitle: {
+    color: colors.onSurface,
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 18,
+    marginTop: 2,
   },
 
   infoText: {
-    color: colors.onSurface,
-    fontSize: 14,
-    marginBottom: 10,
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    paddingRight: 3,
   },
 
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
+  actionArrow: {
+    bottom: 11,
+    position: "absolute",
+    right: 12,
+  },
+
+  pressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.98 }],
+  },
+
+  /* --------------------------------------------------------------------- */
+  /* AI INSIGHT                                                            */
+  /* --------------------------------------------------------------------- */
+
+  aiCard: {
+    backgroundColor: colors.surfaceTertiary,
+    borderColor: colors.borderStrong,
+    borderRadius: 18,
     borderWidth: 1,
+    gap: 12,
+    marginTop: 18,
+    padding: 16,
+  },
+
+  aiHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 11,
+  },
+
+  aiIcon: {
+    alignItems: "center",
+    backgroundColor: colors.brandPrimary,
+    borderRadius: 12,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+
+  aiTitleContainer: {
+    flex: 1,
+    gap: 2,
+  },
+
+  aiLabel: {
+    color: colors.brandSecondary,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+
+  aiTitle: {
+    color: colors.onSurface,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  aiText: {
+    color: colors.onSurfaceTertiary,
+    fontSize: 12,
+    lineHeight: 19,
+  },
+
+  /* --------------------------------------------------------------------- */
+  /* RECENT ASSESSMENTS                                                    */
+  /* --------------------------------------------------------------------- */
+
+  historyRow: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceSecondary,
     borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 11,
+    marginTop: 8,
+    padding: 12,
+  },
+
+  historyIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(24, 217, 155, 0.12)",
+    borderRadius: 10,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
   },
 
   historyCopy: {
     flex: 1,
+    gap: 3,
   },
 
   historyTitle: {
     color: colors.onSurface,
     fontSize: 14,
-    fontWeight: "700",
-    marginBottom: 4,
+    fontWeight: "800",
+    textTransform: "capitalize",
   },
 
   historyMeta: {
-    color: colors.onSurfaceSecondary,
-    fontSize: 12,
+    color: colors.muted,
+    fontSize: 11,
   },
+
+  /* --------------------------------------------------------------------- */
+  /* TRAINER / ADMIN WORKSPACE                                             */
+  /* --------------------------------------------------------------------- */
+
+  workspaceCard: {
+    alignItems: "center",
+    backgroundColor: colors.brandPrimary,
+    borderRadius: 21,
+    flexDirection: "row",
+    gap: 14,
+    marginTop: 18,
+    padding: 18,
+  },
+
+  workspaceIcon: {
+    alignItems: "center",
+    backgroundColor: colors.brandSecondary,
+    borderRadius: 15,
+    height: 50,
+    justifyContent: "center",
+    width: 50,
+  },
+
+  workspaceContent: {
+    flex: 1,
+    gap: 3,
+  },
+
+  workspaceLabel: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+  },
+
+  workspaceTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+
+  workspaceText: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  /* --------------------------------------------------------------------- */
+  /* LOADING                                                               */
+  /* --------------------------------------------------------------------- */
 
   centered: {
     alignItems: "center",
+    padding: 16,
+  },
+
+  /* --------------------------------------------------------------------- */
+  /* PROFILE LINK                                                          */
+  /* --------------------------------------------------------------------- */
+
+  profileLinkContainer: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 7,
     justifyContent: "center",
-    paddingVertical: 24,
+    marginTop: 16,
+    paddingVertical: 13,
   },
 
   profileLink: {
     color: colors.brandPrimary,
-    fontSize: 14,
-    fontWeight: "700",
-    marginTop: 12,
-    marginBottom: 24,
+    fontSize: 13,
+    fontWeight: "800",
   },
 }));
