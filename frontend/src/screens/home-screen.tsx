@@ -702,7 +702,7 @@ function EmployerDashboard() {
           icon="domain"
           title="Company profile"
           text="Name, industry, location"
-          onPress={() => router.push("/profile")}
+          onPress={() => router.push("/employer-profile")}
         />
       </View>
     </View>
