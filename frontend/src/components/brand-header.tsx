@@ -13,15 +13,50 @@ export function BrandHeader({ compact = false }: { compact?: boolean }) {
         source={{ uri: SKILLALIGN_LOGO_DATA_URI }}
         style={compact ? styles.compactLogo : styles.logo}
       />
-      {!compact ? <Text style={styles.tagline}>From learning to earning</Text> : null}
+
+
     </View>
   );
 }
 
 const useStyles = makeStyles((colors) => ({
-  container: { alignItems: "center", gap: 2 },
-  compact: { alignItems: "flex-start" },
-  logo: { width: 210, height: 170 },
-  compactLogo: { width: 128, height: 58 },
-  tagline: { color: colors.muted, fontSize: 13, letterSpacing: 0.4 },
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    marginBottom: 8,
+  },
+
+  compact: {
+    alignItems: "flex-start",
+    width: "auto",
+    marginBottom: 0,
+  },
+
+  logo: {
+    width: 320,
+    height: 210,
+    marginBottom: 2,
+  },
+
+  compactLogo: {
+    width: 128,
+    height: 58,
+  },
+
+  brandName: {
+    color: colors.onSurface,
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    marginTop: -8,
+  },
+
+  tagline: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "500",
+    letterSpacing: 0.5,
+    marginTop: 4,
+  },
 }));
