@@ -98,7 +98,7 @@ export function useTheme(): {
   const system = useColorScheme();
 
   const scheme: ColorScheme =
-    system && themes[system] ? system : defaultScheme;
+  system === "light" || system === "dark" ? system : defaultScheme;
 
   return {
     scheme,
