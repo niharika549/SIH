@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: "https://skillalign-backend-6gux.onrender.com",
   headers: {
     "Content-Type": "application/json",
   },
