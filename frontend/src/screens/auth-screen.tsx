@@ -78,7 +78,7 @@ export function AuthScreen() {
           {mode === "register" ? <Field label="Full name" value={fullName} onChangeText={setFullName} placeholder="Aarav Sharma" testID="register-name-input" /> : null}
           <Field label="Email address" value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" testID="login-email-input" />
           <Field label="Password" value={password} onChangeText={setPassword} placeholder="Minimum 8 characters" secureTextEntry testID="login-password-input" />
-          {mode === "register" ? <View style={styles.roleBlock}><Text style={styles.fieldLabel}>I am joining as</Text><RoleSelector value={role} onChange={setRole} /><Text style={styles.helper}>Employer and Government accounts require administrator verification.</Text></View> : null}
+          {mode === "register" ? <View style={styles.roleBlock}><Text style={styles.fieldLabel}>I am joining as</Text><RoleSelector value={role} onChange={setRole} /><Text style={styles.helper}>Government accounts require administrator verification.</Text></View> : null}
           {notice ? <View style={styles.notice}><MaterialCommunityIcons name="information-outline" size={18} color={colors.info} /><Text style={styles.noticeText}>{notice}</Text></View> : null}
           {error ? <View style={styles.error}><MaterialCommunityIcons name="alert-circle-outline" size={18} color={colors.error} /><Text style={styles.errorText}>{error}</Text></View> : null}
           <Pressable accessibilityRole="button" disabled={submitting} onPress={submit} style={({ pressed }) => [styles.submit, pressed && styles.pressed, submitting && styles.disabled]} testID={mode === "signin" ? "login-submit-button" : "register-submit-button"}>

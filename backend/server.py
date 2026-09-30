@@ -321,14 +321,11 @@ async def register(input: RegisterRequest):
             detail="An account with this email already exists",
         )
 
-    # Employer, Trainer and Government require admin approval.
+    # Government require admin approval.
     account_status = (
         AccountStatus.PENDING
-        if input.role in {
-            Role.EMPLOYER,
-            Role.GOVERNMENT,
-            Role.TRAINER,
-        }
+        if input.role ==Role.GOVERNMENT
+        
         else AccountStatus.ACTIVE
     )
 
